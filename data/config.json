@@ -1,0 +1,8 @@
+{
+  "tiers": {
+    "guest": { "maxRooms": 5, "ttlDays": 14 },
+    "user":  { "maxRooms": 20, "ttlDays": 60 },
+    "admin": { "maxRooms": 200, "ttlDays": 365 }
+  },
+  "adminEmail": "info@pikso.ru"
+}

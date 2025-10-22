@@ -1,0 +1,45 @@
+name: Deploy (SSH + PM2)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      SSH_PORT: ${{ secrets.SSH_PORT }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      PM2_APP_NAME: pikso
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Prepare remote folders (and rooms.json if missing)
+        run: |
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p $DEPLOY_PATH/current $DEPLOY_PATH/logs $DEPLOY_PATH/current/data &&             if [ ! -f $DEPLOY_PATH/current/data/rooms.json ]; then echo '[]' > $DEPLOY_PATH/current/data/rooms.json; fi"
+
+      - name: Upload project via rsync (preserve data/rooms.json)
+        run: |
+          rsync -az --delete             --exclude ".git"             --exclude "node_modules"             --exclude ".env"             --exclude "logs"             --exclude "data/rooms.json"             -e "ssh -p $SSH_PORT" ./ "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/current/"
+
+      - name: Install deps & reload PM2
+        run: |
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "
+            cd $DEPLOY_PATH/current &&             if ! command -v pm2 >/dev/null 2>&1; then sudo npm i -g pm2; fi &&             NODE_ENV=production npm ci --omit=dev || npm i --omit=dev &&             pm2 startOrReload ecosystem.config.cjs --env production &&             pm2 save
+          "
