@@ -610,9 +610,9 @@
       }
       panning=false;
     }
-    c.addEventListener('pointerup', e=>{ panning = false; if(activeTool==='eraser'){ erasingDrag=false; return; } endStroke(e); });
-    c.addEventListener('pointercancel', e=>{ panning = false; if(activeTool==='eraser'){ erasingDrag=false; return; } endStroke(e); });
-    c.addEventListener('pointerleave', ()=>{ panning = false; erasingDrag=false; lastWorld=null; updateCursor(); socket.emit('cursor',{roomId,x:0,y:0,visible:false,name:(nameEl.value||'').trim()||'Гость',color:colorEl.value}); });
+    c.addEventListener('pointerup', e=>{ if(activeTool==='eraser'){ erasingDrag=false; return; } endStroke(e); });
+    c.addEventListener('pointercancel', e=>{ if(activeTool==='eraser'){ erasingDrag=false; return; } endStroke(e); });
+    c.addEventListener('pointerleave', ()=>{ erasingDrag=false; lastWorld=null; updateCursor(); socket.emit('cursor',{roomId,x:0,y:0,visible:false,name:(nameEl.value||'').trim()||'Гость',color:colorEl.value}); });
 
     undoBtn.addEventListener('click', ()=>{ socket.emit('undo', roomId); });
     redoBtn.addEventListener('click', ()=>{ socket.emit('redo', roomId); });
