@@ -34,15 +34,10 @@
     .popover{
       position: absolute; left: 56px; top: 0;
       background:var(--panel); border:1px solid var(--panel-border); border-radius:10px;
-      padding:10px; box-shadow:var(--panel-shadow); z-index: 1600; width: 220px; color:var(--fg);
+      padding:10px; box-shadow:var(--panel-shadow); z-index: 1600; width: 180px; color:var(--fg);
     }
     .pop-title{ font-size:12px; color:var(--muted); margin-bottom:6px; }
     .pop-val{ font-size:12px; margin-top:6px; text-align:right; }
-
-    /* предпросмотр размера */
-    .size-preview{ display:flex; align-items:center; gap:10px; margin-top:8px; min-height:32px; }
-    .size-dot{ display:inline-block; border-radius:50%; opacity:.7; background:#111; box-shadow:0 1px 2px rgba(0,0,0,.15); }
-    .size-text{ font-family: system-ui, Segoe UI, Roboto, Arial; color: var(--fg); opacity: .9; line-height:1; white-space:nowrap; }
 
     .badge { position:fixed; right:12px; bottom:12px; display:flex; gap:10px; align-items:center; z-index:1200; }
     .chip{ background:var(--chip-bg); border:1px solid var(--chip-border); border-radius:999px; padding:6px 10px; cursor:default; position:relative; color:var(--fg); }
@@ -66,7 +61,7 @@
     .modal { background:var(--panel); color:var(--fg); border-radius:12px; padding:16px; width:320px; box-shadow:var(--panel-shadow); border:1px solid var(--panel-border); }
     .modal .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
     .btn { padding:8px 10px; border-radius:10px; border:1px solid var(--panel-border); background:var(--panel); color:var(--fg); cursor:pointer; }
-    .btn.primary { background:var(--accent); color:#fff; border-color:#0F8FFF; }
+    .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
 
     #toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
       background: rgba(17,17,17,.92); color:#fff; padding:10px 14px; border-radius:8px;
@@ -144,11 +139,7 @@
     <button id="ellipse" class="iconbtn" title="Эллипс (O)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="8" ry="5"/></svg></button>
 
     <!-- Текст -->
-    <button id="text" class="iconbtn" title="Текст (T)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-  <path d="M4 6V4h16v2"/>
-  <path d="M10 20V6"/>
-  <path d="M14 20V6"/>
-</svg></button>
+    <button id="text" class="iconbtn" title="Текст (T)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6V4h16v2M10 20V6m4 14V6"/></svg></button>
 
     <button id="gridBtn" class="iconbtn" title="Сетка (G)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></button>
 
@@ -158,13 +149,7 @@
     <div id="sizePopover" class="popover" style="display:none;">
       <div class="pop-title">Толщина линии / Размер текста</div>
       <input id="size" type="range" min="1" max="40" value="3" step="1" style="width:100%">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px">
-        <div class="pop-title">Предпросмотр</div>
-        <div id="sizeVal" class="pop-val">3</div>
-      </div>
-      <div id="sizePreview" class="size-preview">
-        <!-- сюда рисуем точку или слово «пример» -->
-      </div>
+      <div id="sizeVal" class="pop-val">3</div>
     </div>
 
     <input id="color" type="color" title="Цвет" class="iconbtn" style="padding:0;height:42px;width:42px;"/>
@@ -263,7 +248,7 @@
 
   <div id="confirmModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-label="Подтверждение" style="width:360px">
-      <h3>Подтверждение</h3>
+      <h3>Подверждение</h3>
       <div id="confirmText" style="margin-top:6px">Вы уверены?</div>
       <div class="actions">
         <button id="confirmCancel" class="btn">Отмена</button>
@@ -364,7 +349,7 @@
     colorEl.value=localStorage.getItem('pikso:color')||'#0F8FFF';
     function sendPresence(){ var name=(nameEl.value||'').trim()||'Гость'; localStorage.setItem('pikso:name', name); socket.emit('presence', { roomId, name, color: colorEl.value }); }
     nameEl.addEventListener('input', sendPresence);
-    colorEl.addEventListener('change', function(){ localStorage.setItem('pikso:color', colorEl.value); sendPresence(); refreshSizePreview(); });
+    colorEl.addEventListener('change', function(){ localStorage.setItem('pikso:color', colorEl.value); sendPresence(); });
 
     function setTool(t){
       activeTool=t;
@@ -374,7 +359,6 @@
       });
       document.body.classList.toggle('eraser-on', t==='eraser');
       updateCursor();
-      refreshSizePreview();
     }
     document.getElementById('pen').onclick=()=>setTool('pen');
     document.getElementById('line').onclick=()=>setTool('line');
@@ -389,35 +373,10 @@
       var sizePopover=document.getElementById('sizePopover');
       var sizeRange=document.getElementById('size');
       var sizeVal=document.getElementById('sizeVal');
-      var sizePreview=document.getElementById('sizePreview');
       sizeVal.textContent=(+sizeRange.value||1);
-      sizeBtn.addEventListener('click', e=>{ sizePopover.style.display=sizePopover.style.display==='none'?'block':'none'; refreshSizePreview(); e.stopPropagation(); });
+      sizeBtn.addEventListener('click', e=>{ sizePopover.style.display=sizePopover.style.display==='none'?'block':'none'; e.stopPropagation(); });
       document.addEventListener('click', e=>{ if(sizePopover.style.display==='block' && !sizePopover.contains(e.target) && e.target!==sizeBtn){ sizePopover.style.display='none'; }});
-      sizeRange.addEventListener('input', function(){ sizeVal.textContent=(+this.value||1); refreshSizePreview(); });
-
-      window.refreshSizePreview=function(){
-        if(!sizePreview) return;
-        sizePreview.innerHTML='';
-        var val = +sizeRange.value || 1;
-        if(activeTool==='text'){
-          var px = Math.max(8, val*4);
-          var span=document.createElement('span');
-          span.className='size-text';
-          span.textContent='пример';
-          span.style.fontSize = px+'px';
-          span.style.color = colorEl.value;
-          span.style.opacity = .9;
-          sizePreview.appendChild(span);
-        } else {
-          var d = Math.max(4, Math.min(48, val)); // видимый диаметр
-          var dot=document.createElement('span');
-          dot.className='size-dot';
-          dot.style.width = d+'px';
-          dot.style.height = d+'px';
-          dot.style.background = colorEl.value;
-          sizePreview.appendChild(dot);
-        }
-      };
+      sizeRange.addEventListener('input', function(){ sizeVal.textContent=(+this.value||1); });
     })();
 
     function updateMembers(list){
@@ -534,7 +493,7 @@
 
     c.addEventListener('contextmenu', e=>e.preventDefault());
     c.addEventListener('pointerdown', function(e){
-      if (window.__textInputOpen) return;
+      if (window.__textInputOpen) return; /* не мешаем активному вводу */
       var isRight=e.button===2, isPan=isRight || (spaceDown && e.button===0);
       if(isPan){ panning=true; lastPan={x:e.clientX,y:e.clientY}; return; }
       if(e.button!==0) return;
@@ -791,7 +750,6 @@
     document.getElementById('helpBtn').addEventListener('click', ()=>document.getElementById('helpModal').classList.add('show'));
     document.getElementById('helpOk').addEventListener('click', ()=>document.getElementById('helpModal').classList.remove('show'));
 
-    // Красивое подтверждение
     function niceConfirm(text){
       return new Promise(function(resolve){
         var m=document.getElementById('confirmModal');
@@ -808,55 +766,15 @@
       });
     }
 
-    // Список/удаление комнат
     var newBtn=document.getElementById('newPrivate'), roomsBtn=document.getElementById('roomsBtn'), roomsWrap=document.getElementById('roomsWrap'), roomsList=document.getElementById('roomsList');
     function addMyRoomLocal(id){ var key='pikso:myRooms'; var arr=[]; try{arr=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){} if(!arr.includes(id)){arr.unshift(id); localStorage.setItem(key, JSON.stringify(arr.slice(0,100)));} }
     function getMyRoomsLocal(){ try{ return JSON.parse(localStorage.getItem('pikso:myRooms')||'[]'); }catch(e){ return []; } }
     async function fetchMyRoomsServer(){ try{ const r=await fetch('/api/rooms?ownerClientId='+encodeURIComponent(clientId)); if(!r.ok) return []; const d=await r.json(); return (d.rooms||[]).map(x=>x.roomId);}catch(e){return [];} }
-    async function refreshRoomsList(){ var local=getMyRoomsLocal(); var server=await fetchMyRoomsServer(); var merged=Array.from(new Set([].concat(server, local))); roomsList.innerHTML=''; if(merged.length===0){ var empty=document.createElement('div'); empty.style.opacity='.7'; empty.style.padding='6px 8px'; empty.textContent='Пока нет приватных страниц'; roomsList.appendChild(empty); return; } merged.forEach(function(id){ var row=document.createElement('div'); row.className='roomRow'; var left=document.createElement('div'); left.innerHTML='<div><b>/'+id+'</b></div><div class="roomId">#'+id+'</div>'; var actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px'; actions.style.alignItems='center'; var openBtn=document.createElement('button'); openBtn.className='btn'; openBtn.textContent='Открыть'; openBtn.onclick=function(ev){ ev.stopPropagation(); location.href='/canvas/'+id+(location.hash||''); }; var delBtn=document.createElement('button'); delBtn.type='button'; delBtn.className='roomDelBtn'; delBtn.title='Удалить страницу'; delBtn.setAttribute('data-room-id', id); delBtn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>'; actions.appendChild(openBtn); actions.appendChild(delBtn); row.appendChild(left); row.appendChild(actions); roomsList.appendChild(row); }); }
+    async function refreshRoomsList(){ var local=getMyRoomsLocal(); var server=await fetchMyRoomsServer(); var merged=Array.from(new Set([].concat(server, local))); roomsList.innerHTML=''; if(merged.length===0){ var empty=document.createElement('div'); empty.style.opacity='.7'; empty.style.padding='6px 8px'; empty.textContent='Пока нет приватных страниц'; roomsList.appendChild(empty); return; } merged.forEach(function(id){ var row=document.createElement('div'); row.className='roomRow'; var left=document.createElement('div'); left.innerHTML='<div><b>/'+id+'</b></div><div class="roomId">#'+id+'</div>'; var actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px'; actions.style.alignItems='center'; var openBtn=document.createElement('button'); openBtn.className='btn'; openBtn.textContent='Открыть'; openBtn.onclick=function(){ location.href='/canvas/'+id+(location.hash||''); }; var delBtn=document.createElement('button'); delBtn.className='roomDelBtn'; delBtn.title='Удалить страницу'; delBtn.setAttribute('data-room-id', id); delBtn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6В4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>'; actions.appendChild(openBtn); actions.appendChild(delBtn); row.appendChild(left); row.appendChild(actions); roomsList.appendChild(row); }); }
     newBtn.addEventListener('click', async function(){ try{ const r=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId})}); if(!r.ok) throw 0; const data=await r.json(); addMyRoomLocal(data.roomId); location.href='/canvas/'+data.roomId+'#0,0,1.00'; }catch(e){ alert('Не удалось создать страницу'); } });
     roomsBtn.addEventListener('click', function(e){ roomsWrap.classList.toggle('open'); if(roomsWrap.classList.contains('open')) refreshRoomsList(); e.stopPropagation(); });
     document.addEventListener('click', function(){ roomsWrap.classList.remove('open'); });
 
-    // Удаление с фолбэком (DELETE body → DELETE query)
-    roomsList.addEventListener('click', async function(e){
-      var btn = e.target.closest('.roomDelBtn');
-      if(!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      var id = btn.getAttribute('data-room-id');
-      if(!id) return;
-      var ok = await niceConfirm('Удалить страницу '+id+'?');
-      if(!ok) return;
-
-      async function tryDeleteBody(){
-        return fetch('/api/rooms/'+encodeURIComponent(id), {
-          method:'DELETE',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ clientId })
-        });
-      }
-      async function tryDeleteQuery(){
-        return fetch('/api/rooms/'+encodeURIComponent(id)+'?clientId='+encodeURIComponent(clientId), {
-          method:'DELETE'
-        });
-      }
-
-      try{
-        let r = await tryDeleteBody();
-        if(!r.ok) r = await tryDeleteQuery();
-        if(!r.ok) throw 0;
-        // локальный список
-        var arr = getMyRoomsLocal(); var ix = arr.indexOf(id); if(ix>-1){ arr.splice(ix,1); localStorage.setItem('pikso:myRooms', JSON.stringify(arr)); }
-        // удалить строку
-        btn.closest('.roomRow')?.remove();
-        toast('Страница удалена');
-      }catch(err){
-        alert('Удаление не удалось. Доступ только у владельца.');
-      }
-    });
-
-    // Инициализация вида
     setCanvasSize();
     if (!applyViewFromHash()) {
       scale=1; dx=0; dy=0; clampViewToBoard(); history.replaceState(null,'', location.pathname+'#0,0,1.00');
@@ -864,7 +782,6 @@
     redraw();
     scheduleHashUpdate();
 
-    // Сокеты
     socket.on('connect', function(){ socket.emit('join', { roomId, clientId }); sendPresence(); setTimeout(sendPresence, 80); });
     socket.on('init', function(payload){ strokes=(payload&&payload.strokes)||[]; isOwner = !!(payload && payload.ownerClientId && payload.ownerClientId===clientId); refreshPermissions(); var arr=(payload&&payload.moderators)||[]; moderatorsSet=new Set(arr.map(m=>m.clientId)); updateMembers((payload&&payload.members)||[]); redraw(); });
     socket.on('moderators', function(list){ var arr=list||[]; moderatorsSet=new Set(arr.map(m=>m.clientId)); iAmModerator = moderatorsSet.has(clientId) || iAmModerator; refreshPermissions(); redraw(); });
@@ -890,6 +807,7 @@
       input.placeholder='Текст';
       input.id='pikso-text-input';
       input.style.position='fixed';
+      // клампим позицию, чтобы не уехать за экран и под тулбар
       var pad=8, x=Math.max(pad, Math.min(clientX, innerWidth-220)), y=Math.max(pad, Math.min(clientY, innerHeight-40));
       input.style.left=x+'px';
       input.style.top=y+'px';
@@ -930,9 +848,6 @@
       });
       input.addEventListener('blur', ()=>commit(true));
     }
-
-    // первоначальный рендер предпросмотра
-    refreshSizePreview && refreshSizePreview();
   </script>
 </body>
 </html>
