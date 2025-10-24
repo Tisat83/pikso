@@ -73,180 +73,204 @@
       background: rgba(17,17,17,.92); color:#fff; padding:10px 14px; border-radius:8px;
       display:none; z-index:4000; font:14px/1 system-ui,Segoe UI,Roboto,Arial;
       box-shadow:0 10px 30px rgba(0,0,0,.25); }
+  
+/* --- Landing mode --- */
+#landing{display:none;min-height:100%;padding:48px 20px;box-sizing:border-box}
+body.landing #landing{display:block}
+body.landing #toolbar,
+body.landing #c,
+body.landing .badge,
+body.landing #downloadModal,
+body.landing #helpModal,
+body.landing #authModal,
+body.landing #confirmModal{display:none !important}
+</style>
 
-    /* Landing */
-    #landing { display:none; min-height:100%; padding:48px 20px; box-sizing:border-box; }
-    .hero { max-width:980px; margin:0 auto; display:grid; grid-template-columns:1.2fr 0.8fr; gap:24px; align-items:center; }
-    .hero h1 { font-size:40px; line-height:1.1; margin:0 0 12px; }
-    .hero p { color:var(--muted); margin:6px 0 14px; }
-    .cta { display:flex; gap:10px; align-items:center; margin-top:10px; }
-    .cta .big { padding:12px 16px; border-radius:12px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; font-weight:600; }
-    .cta .ghost { padding:12px 16px; border-radius:12px; border:1px solid var(--panel-border); background:var(--panel); color:var(--fg); cursor:pointer; }
-    .list { margin-top:10px; font-size:15px; }
-    .list li { margin:6px 0; }
-  </style>
+<script>
+(function(){
+  var onRoot = (location.pathname === '/' || location.pathname === '');
+  var legacy = /^(#r-|#demo)/.test(location.hash);
+  if (onRoot && !legacy){
+    document.documentElement.classList.add('landing-html');
+    document.addEventListener('DOMContentLoaded', function(){ try{ document.body.classList.add('landing'); }catch(e){} });
+    try { history.replaceState = function(){ /* no-op on landing */ }; } catch(e){}
+  }
+  window.__PIKSO_LANDING__ = onRoot && !legacy;
+})();
+</script>
 </head>
 <body>
-  <!-- Landing (root, no hash) -->
+
+  <!-- Landing (root) -->
   <main id="landing" aria-label="Приветствие Pikso">
-    <div class="hero">
+    <div style="max-width:980px;margin:0 auto;display:grid;grid-template-columns:1.2fr 0.8fr;gap:24px;align-items:center">
       <section>
-        <h1>Pikso — онлайн-доска для быстрых эскизов</h1>
-        <p>Рисуйте вместе в реальном времени: карандаш, линии, прямоугольники, эллипсы, ластик, Undo/Redo, экспорт PNG/PDF. Приватные страницы — в один клик.</p>
-        <div class="cta">
-          <button id="openDemo" class="big">Открыть демо-доску</button>
-          <button id="openPrivate" class="ghost" title="Создать приватную страницу и перейти к ней">Новая приватная</button>
+        <h1 style="font-size:40px;line-height:1.1;margin:0 0 12px">Pikso — онлайн‑доска для быстрых эскизов</h1>
+        <p style="color:#6b7280;margin:6px 0 14px">Рисуйте вместе в реальном времени. Приватные страницы и экспорт PNG/PDF.</p>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button id="openDemo" style="padding:12px 16px;border-radius:12px;border:1px solid #0F8FFF;background:#0F8FFF;color:#fff;cursor:pointer;font-weight:600">Открыть демо‑доску</button>
+          <button id="openPrivate" style="padding:12px 16px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;color:#111827;cursor:pointer">Новая приватная</button>
         </div>
-        <ul class="list">
-          <li>Совместное рисование и курсоры участников</li>
-          <li>Приватные страницы с владельцем и модераторами</li>
-          <li>«Показать весь рисунок» и экспорт PNG/PDF</li>
-        </ul>
       </section>
       <aside></aside>
     </div>
   </main>
+  <script>
+  (function(){
+    if(!window.__PIKSO_LANDING__) return;
+    var btn1=document.getElementById('openDemo');
+    if(btn1) btn1.addEventListener('click', function(){ location.href='/canvas/demo'; });
+    var btn2=document.getElementById('openPrivate');
+    if(btn2) btn2.addEventListener('click', async function(){
+      var cid = localStorage.getItem('pikso:clientId');
+      if (!cid) { try{ cid=([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,function(c){return (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16);}); localStorage.setItem('pikso:clientId', cid);}catch(e){} }
+      try{
+        const r=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId: cid||''})});
+        if(!r.ok) throw 0;
+        const data=await r.json();
+        location.href='/canvas/'+data.roomId;
+      }catch(e){ alert('Не удалось создать страницу'); }
+    });
+  })();
+  </script>
 
-  <!-- App -->
-  <div id="app">
-    <div id="toolbar">
-      <input id="name" maxlength="20" placeholder="Имя"/>
-      <!-- tools -->
-      <button id="pen" class="iconbtn active" title="Карандаш (P)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-      </button>
-      <button id="line" class="iconbtn" title="Прямая линия (L)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20L20 4"/></svg></button>
-      <button id="rect" class="iconbtn" title="Прямоугольник (R)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/></svg></button>
-      <button id="ellipse" class="iconbtn" title="Эллипс (O)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="8" ry="5"/></svg></button>
-      <button id="gridBtn" class="iconbtn" title="Сетка (G)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></button>
+  <div id="toolbar">
+    <input id="name" maxlength="20" placeholder="Имя"/>
+    <!-- tools -->
+    <button id="pen" class="iconbtn active" title="Карандаш (P)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    </button>
+    <button id="line" class="iconbtn" title="Прямая линия (L)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20L20 4"/></svg></button>
+    <button id="rect" class="iconbtn" title="Прямоугольник (R)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/></svg></button>
+    <button id="ellipse" class="iconbtn" title="Эллипс (O)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="8" ry="5"/></svg></button>
+    <button id="gridBtn" class="iconbtn" title="Сетка (G)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></button>
 
-      <button id="sizeBtn" class="iconbtn" title="Толщина">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="4"/></svg>
-      </button>
-      <div id="sizePopover" class="popover" style="display:none;">
-        <div class="pop-title">Толщина линии</div>
-        <input id="size" type="range" min="1" max="40" value="3" step="1" style="width:100%">
-        <div id="sizeVal" class="pop-val">3 px</div>
-      </div>
-
-      <input id="color" type="color" title="Цвет" class="iconbtn" style="padding:0;height:42px;width:42px;"/>
-
-      <button id="undo" class="iconbtn" title="Отменить (Ctrl+Z)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7"/></svg>
-      </button>
-      <button id="redo" class="iconbtn" title="Повторить (Ctrl+Shift+Z)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7"/></svg>
-      </button>
-      <button id="clear" class="iconbtn" title="Очистить (Del)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>
-        </svg>
-      </button>
-
-      <div class="sep"></div>
-      <button id="fit" class="iconbtn" title="Показать весь рисунок / Сброс вида">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><rect x="8" y="8" width="8" height="8"/></svg>
-      </button>
-
-      <div class="sep"></div>
-      <button id="eraser" class="iconbtn" title="Ластик (E)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 20H8l-5-5 9-9a3 3 0 0 1 4 0l5 5-8 8"/><path d="M12 12l-8 8"/></svg>
-      </button>
-
-      <div class="sep"></div>
-      <button id="downloadBtn" class="iconbtn" title="Скачать">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path>
-        </svg>
-      </button>
-      <button id="shareBtn" class="iconbtn" title="Скопировать ссылку">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a5 5 0 0 1 5-5h3"/><path d="M15 7l4-4"/><path d="M15 7h4V3"/><path d="M20 12a5 5 0 0 1-5 5h-3"/><path d="M9 17l-4 4"/><path d="M9 17H5v4"/></svg>
-      </button>
-
-      <div class="sep"></div>
-      <button id="newPrivate" class="iconbtn" title="Новая приватная"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M12 8v8"></path><path d="M8 12h8"></path></svg></button>
-      <div id="roomsWrap">
-        <button id="roomsBtn" class="iconbtn" title="Мои страницы"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg></button>
-        <div id="roomsList"></div>
-      </div>
-
-      <div class="sep"></div>
-      <button id="loginBtn" class="iconbtn" title="Вход / Регистрация">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17a5 5 0 1 0-5-5 5 5 0 0 0 5 5z"/><path d="M20 21v-2a4 4 0 0 0-4-4h-4"/></svg>
-      </button>
-
-      <!-- theme toggle to bottom -->
-      <div class="sep"></div>
-      <button id="themeBtn" class="iconbtn" title="Тема: светлая/тёмная"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a9 9 0 1 0 9 9c0-4.97-4.03-9-9-9z"/></svg></button>
-      <button id="helpBtn" class="iconbtn" title="Подсказки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.82 1c0 2-3 2-3 4"/><path d="M12 17h.01"/></svg></button>
+    <button id="sizeBtn" class="iconbtn" title="Толщина">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="4"/></svg>
+    </button>
+    <div id="sizePopover" class="popover" style="display:none;">
+      <div class="pop-title">Толщина линии</div>
+      <input id="size" type="range" min="1" max="40" value="3" step="1" style="width:100%">
+      <div id="sizeVal" class="pop-val">3 px</div>
     </div>
 
-    <canvas id="c"></canvas>
+    <input id="color" type="color" title="Цвет" class="iconbtn" style="padding:0;height:42px;width:42px;"/>
 
-    <!-- bottom-right eye (online) -->
-    <div class="badge">
-      <div id="onlineChip" class="chip" title="Кто онлайн"></div>
+    <button id="undo" class="iconbtn" title="Отменить (Ctrl+Z)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7"/></svg>
+    </button>
+    <button id="redo" class="iconbtn" title="Повторить (Ctrl+Shift+Z)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M21 13a9 9 0 1 1-3-7.7"/></svg>
+    </button>
+    <button id="clear" class="iconbtn" title="Очистить (Del)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>
+      </svg>
+    </button>
+
+    <div class="sep"></div>
+    <button id="fit" class="iconbtn" title="Показать весь рисунок / Сброс вида">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><rect x="8" y="8" width="8" height="8"/></svg>
+    </button>
+
+    <div class="sep"></div>
+    <button id="eraser" class="iconbtn" title="Ластик (E)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 20H8l-5-5 9-9a3 3 0 0 1 4 0l5 5-8 8"/><path d="M12 12l-8 8"/></svg>
+    </button>
+
+    <div class="sep"></div>
+    <button id="downloadBtn" class="iconbtn" title="Скачать">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path>
+      </svg>
+    </button>
+    <button id="shareBtn" class="iconbtn" title="Скопировать ссылку">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a5 5 0 0 1 5-5h3"/><path d="M15 7l4-4"/><path d="M15 7h4V3"/><path d="M20 12a5 5 0 0 1-5 5h-3"/><path d="M9 17l-4 4"/><path d="M9 17H5v4"/></svg>
+    </button>
+
+    <div class="sep"></div>
+    <button id="newPrivate" class="iconbtn" title="Новая приватная"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M12 8v8"></path><path d="M8 12h8"></path></svg></button>
+    <div id="roomsWrap">
+      <button id="roomsBtn" class="iconbtn" title="Мои страницы"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg></button>
+      <div id="roomsList"></div>
     </div>
 
-    <!-- download modal -->
-    <div id="downloadModal" class="modal-backdrop" aria-hidden="true">
-      <div class="modal" role="dialog" aria-modal="true" aria-label="Скачать рисунок">
-        <h3>Скачать рисунок</h3>
-        <div class="row"><label><input type="radio" name="fmt" value="png" checked> PNG (растровый)</label></div>
-        <div class="row"><label><input type="radio" name="fmt" value="pdf"> PDF (векторный)</label></div>
-        <div class="actions">
-          <button id="dlCancel" class="btn">Отмена</button>
-          <button id="dlOk" class="btn primary">Скачать</button>
-        </div>
-      </div>
-    </div>
+    <div class="sep"></div>
+    <button id="loginBtn" class="iconbtn" title="Вход / Регистрация">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 17a5 5 0 1 0-5-5 5 5 0 0 0 5 5z"/><path d="M20 21v-2a4 4 0 0 0-4-4h-4"/></svg>
+    </button>
 
-    <!-- login/register modal (UI-заглушка) -->
-    <div id="authModal" class="modal-backdrop" aria-hidden="true">
-      <div class="modal" role="dialog" aria-modal="true" aria-label="Вход / Регистрация" style="width:360px">
-        <h3>Вход / Регистрация</h3>
-        <div style="display:flex; flex-direction:column; gap:8px">
-          <input id="authEmail" type="email" placeholder="email@example.com" style="padding:8px; border-radius:8px; border:1px solid var(--panel-border); background:var(--panel); color:var(--fg)">
-          <input id="authPass" type="password" placeholder="Пароль" style="padding:8px; border-radius:8px; border:1px solid var(--panel-border); background:var(--panel); color:var(--fg)">
-        </div>
-        <div class="actions">
-          <button id="authCancel" class="btn">Отмена</button>
-          <button id="authSubmit" class="btn primary">Продолжить</button>
-        </div>
-        <div style="font-size:12px; color:var(--muted); margin-top:6px">* Серверная часть будет добавлена позже.</div>
-      </div>
-    </div>
-
-    <!-- help modal -->
-    <div id="helpModal" class="modal-backdrop" aria-hidden="true">
-      <div class="modal" role="dialog" aria-modal="true" aria-label="Подсказки" style="width:360px">
-        <h3>Подсказки</h3>
-        <ul style="font:13px/1.5 system-ui,Segoe UI,Roboto,Arial,sans-serif; padding-left:18px;">
-          <li><b>ЛКМ</b> — рисовать • <b>ПКМ</b> или <b>Пробел+ЛКМ</b> — панорама</li>
-          <li><b>Ctrl+колесо</b> — зум • <b>F</b> — показать весь рисунок • <b>0</b> — сброс вида</li>
-          <li><b>E</b> — ластик (клик по штриху) • <b>Delete</b> — очистить</li>
-          <li><b>Ctrl+Z</b> — отмена • <b>Ctrl+Shift+Z</b> — повтор</li>
-          <li>«Скачать» — PNG или PDF; «Новая приватная» — уникальная ссылка; «Мои страницы» — список твоих</li>
-        </ul>
-        <div class="actions"><button id="helpOk" class="btn primary">Понятно</button></div>
-      </div>
-    </div>
-
-    <!-- confirm delete room -->
-    <div id="confirmModal" class="modal-backdrop" aria-hidden="true">
-      <div class="modal" role="dialog" aria-modal="true" aria-label="Подтверждение" style="width:360px">
-        <h3 style="margin-top:0">Удаление страницы</h3>
-        <div id="confirmText" style="margin: 6px 0 2px;">Вы хотите удалить данную страницу?</div>
-        <div class="actions">
-          <button id="confirmNo" class="btn">Нет</button>
-          <button id="confirmYes" class="btn primary">Да</button>
-        </div>
-      </div>
-    </div>
-
-    <div id="toast" role="status"></div>
+    <!-- theme toggle to bottom -->
+    <div class="sep"></div>
+    <button id="themeBtn" class="iconbtn" title="Тема: светлая/тёмная"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a9 9 0 1 0 9 9c0-4.97-4.03-9-9-9z"/></svg></button>
+    <button id="helpBtn" class="iconbtn" title="Подсказки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.82 1c0 2-3 2-3 4"/><path d="M12 17h.01"/></svg></button>
   </div>
+
+  <canvas id="c"></canvas>
+
+  <!-- bottom-right eye (online) -->
+  <div class="badge">
+    <div id="onlineChip" class="chip" title="Кто онлайн"></div>
+  </div>
+
+  <!-- download modal -->
+  <div id="downloadModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Скачать рисунок">
+      <h3>Скачать рисунок</h3>
+      <div class="row"><label><input type="radio" name="fmt" value="png" checked> PNG (растровый)</label></div>
+      <div class="row"><label><input type="radio" name="fmt" value="pdf"> PDF (векторный)</label></div>
+      <div class="actions">
+        <button id="dlCancel" class="btn">Отмена</button>
+        <button id="dlOk" class="btn primary">Скачать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- login/register modal (UI-заглушка) -->
+  <div id="authModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Вход / Регистрация" style="width:360px">
+      <h3>Вход / Регистрация</h3>
+      <div style="display:flex; flex-direction:column; gap:8px">
+        <input id="authEmail" type="email" placeholder="email@example.com" style="padding:8px; border-radius:8px; border:1px solid var(--panel-border); background:var(--panel); color:var(--fg)">
+        <input id="authPass" type="password" placeholder="Пароль" style="padding:8px; border-radius:8px; border:1px solid var(--panel-border); background:var(--panel); color:var(--fg)">
+      </div>
+      <div class="actions">
+        <button id="authCancel" class="btn">Отмена</button>
+        <button id="authSubmit" class="btn primary">Продолжить</button>
+      </div>
+      <div style="font-size:12px; color:var(--muted); margin-top:6px">* Серверная часть будет добавлена позже.</div>
+    </div>
+  </div>
+
+  <!-- help modal -->
+  <div id="helpModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Подсказки" style="width:360px">
+      <h3>Подсказки</h3>
+      <ul style="font:13px/1.5 system-ui,Segoe UI,Roboto,Arial,sans-serif; padding-left:18px;">
+        <li><b>ЛКМ</b> — рисовать • <b>ПКМ</b> или <b>Пробел+ЛКМ</b> — панорама</li>
+        <li><b>Ctrl+колесо</b> — зум • <b>F</b> — показать весь рисунок • <b>0</b> — сброс вида</li>
+        <li><b>E</b> — ластик (клик по штриху) • <b>Delete</b> — очистить</li>
+        <li><b>Ctrl+Z</b> — отмена • <b>Ctrl+Shift+Z</b> — повтор</li>
+        <li>«Скачать» — PNG или PDF; «Новая приватная» — уникальная ссылка; «Мои страницы» — список твоих</li>
+      </ul>
+      <div class="actions"><button id="helpOk" class="btn primary">Понятно</button></div>
+    </div>
+  </div>
+
+  <!-- confirm delete room -->
+  <div id="confirmModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Подтверждение" style="width:360px">
+      <h3 style="margin-top:0">Удаление страницы</h3>
+      <div id="confirmText" style="margin: 6px 0 2px;">Вы хотите удалить данную страницу?</div>
+      <div class="actions">
+        <button id="confirmNo" class="btn">Нет</button>
+        <button id="confirmYes" class="btn primary">Да</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" role="status"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -269,9 +293,18 @@
       });
     })();
 
+    
+    // Room id from /canvas/:id or legacy #room
+    function parseRoomFromURL(){
+      var m = (location.pathname||'').match(/^\/canvas\/([^\/?#]+)/);
+      if (m && m[1]) return decodeURIComponent(m[1]);
+      if (location.hash && /^(#r-|#demo)/.test(location.hash)) return location.hash.slice(1); // legacy
+      return null;
+    }
+
     // IDs
     var clientId = (function(){ var id=localStorage.getItem("pikso:clientId"); if(!id){ id=uuid(); localStorage.setItem("pikso:clientId", id);} return id; })();
-    var roomId = location.hash.slice(1) || "demo";
+    var roomId = parseRoomFromURL() || "demo";
 
     // Sockets + presence
     var socket=io();
@@ -291,6 +324,29 @@
 
     var activeTool='pen';
     var scale=1, dx=0, dy=0, MIN_Z=.25, MAX_Z=5;
+    // View coordinates in URL hash: #x,y,scale
+    function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+    function updateHashNow(){
+      var cx = (innerWidth/2 - dx)/scale;
+      var cy = (innerHeight/2 - dy)/scale;
+      var sc = scale;
+      var hash = '#' + Math.round(cx) + ',' + Math.round(cy) + ',' + sc.toFixed(2);
+      if(location.hash !== hash) history.replaceState(null,'', location.pathname + hash);
+    }
+    var _hashTimer=null;
+    function scheduleHashUpdate(){ clearTimeout(_hashTimer); _hashTimer=setTimeout(updateHashNow, 120); }
+    function applyViewFromHash(){
+      var m = (location.hash||'').match(/^#(-?\d+),(-?\d+),(\d+(?:\.\d+)?)/);
+      if(!m) return;
+      var cx = parseFloat(m[1]||'0'), cy=parseFloat(m[2]||'0'), sc=parseFloat(m[3]||'1');
+      sc = clamp(sc, MIN_Z, MAX_Z);
+      scale = sc;
+      dx = innerWidth/2 - cx*scale;
+      dy = innerHeight/2 - cy*scale;
+      redraw();
+    }
+    window.addEventListener('hashchange', applyViewFromHash);
+
     var strokes=[], previews=new Map(), members=[], remoteCursors=new Map();
     var drawing=false, current=null, currentTempId=null;
     var panning=false, spaceDown=false, lastPan={x:0,y:0};
@@ -356,7 +412,7 @@
     function setTransform(){ var dpr=getDPR(); ctx.setTransform(dpr*scale,0,0,dpr*scale,dx*dpr,dy*dpr); }
     function clearScreen(){ var dpr=getDPR(); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,c.width,c.height); }
     function fitCanvas(){ var dpr=getDPR(), w=innerWidth, h=innerHeight; c.width=Math.floor(w*dpr); c.height=Math.floor(h*dpr); c.style.width=w+'px'; c.style.height=h+'px'; redraw(); }
-    addEventListener('resize', fitCanvas);
+    addEventListener('resize', function(){ fitCanvas(); scheduleHashUpdate(); });
     function toWorld(x,y){ return { x:(x-dx)/scale, y:(y-dy)/scale }; }
 
     function drawGrid(){
@@ -411,7 +467,7 @@
     c.addEventListener('pointermove', function(e){
       var w=toWorld(e.clientX,e.clientY), now=performance.now();
       if(!window.__lastCursor || now-window.__lastCursor>30){ window.__lastCursor=now; socket.emit('cursor',{roomId,x:w.x,y:w.y,visible:true,name:(nameEl.value||'').trim()||'Гость',color:colorEl.value}); }
-      if(panning){ var dxs=e.clientX-lastPan.x,dys=e.clientY-lastPan.y; dx+=dxs; dy+=dys; lastPan={x:e.clientX,y:e.clientY}; redraw(); return; }
+      if(panning){ var dxs=e.clientX-lastPan.x,dys=e.clientY-lastPan.y; dx+=dxs; dy+=dys; lastPan={x:e.clientX,y:e.clientY}; redraw(); scheduleHashUpdate(); return; }
       if(activeTool==='eraser'){
         if(erasingDrag){ eraseAt(e.clientX, e.clientY); return; }
         var r=1/scale; var s=findTargetStrokeAt(w.x,w.y,r);
@@ -444,11 +500,11 @@
     c.addEventListener('pointerleave', function(){ erasingDrag=false; socket.emit('cursor',{roomId,x:0,y:0,visible:false,name:(nameEl.value||'').trim()||'Гость',color:colorEl.value}); });
 
     // Zoom
-    c.addEventListener('wheel', function(e){ if(!e.ctrlKey) return; e.preventDefault(); var prev=scale, f=Math.pow(1.1,-Math.sign(e.deltaY)); scale=Math.min(MAX_Z,Math.max(MIN_Z,scale*f)); var mx=e.clientX,my=e.clientY; var wx=(mx-dx)/prev, wy=(my-dy)/prev; dx=mx-wx*scale; dy=my-wy*scale; redraw(); }, {passive:false});
+    c.addEventListener('wheel', function(e){ if(!e.ctrlKey) return; e.preventDefault(); var prev=scale, f=Math.pow(1.1,-Math.sign(e.deltaY)); scale=Math.min(MAX_Z,Math.max(MIN_Z,scale*f)); var mx=e.clientX,my=e.clientY; var wx=(mx-dx)/prev, wy=(my-dy)/prev; dx=mx-wx*scale; dy=my-wy*scale; redraw(); scheduleHashUpdate(); }, {passive:false});
 
     // Fit / reset
-    function resetView(){ scale=1; dx=0; dy=0; redraw(); }
-    function fitToDrawing(){ var bbox=computeBounds(24); if(!bbox){ resetView(); return;} var vw=innerWidth,vh=innerHeight; var s=Math.min(vw/bbox.w, vh/bbox.h); s=Math.min(5, Math.max(0.25, s)); scale=s; var cx=bbox.x+bbox.w/2, cy=bbox.y+bbox.h/2; dx=vw/2-cx*scale; dy=vh/2-cy*scale; redraw(); }
+    function resetView(){ scale=1; dx=0; dy=0; redraw(); scheduleHashUpdate(); }
+    function fitToDrawing(){ var bbox=computeBounds(24); if(!bbox){ resetView(); return;} var vw=innerWidth,vh=innerHeight; var s=Math.min(vw/bbox.w, vh/bbox.h); s=Math.min(5, Math.max(0.25, s)); scale=s; var cx=bbox.x+bbox.w/2, cy=bbox.y+bbox.h/2; dx=vw/2-cx*scale; dy=vh/2-cy*scale; redraw(); scheduleHashUpdate(); }
     var __fitToggle=false;
     fitBtn.onclick=function(){ if(!__fitToggle){ fitToDrawing(); __fitToggle=true; fitBtn.title='Сброс вида (клик)'; } else { resetView(); __fitToggle=false; fitBtn.title='Показать весь рисунок (клик)'; } };
     c.addEventListener('wheel', function(e){ if(e.ctrlKey) __fitToggle=false; }, {passive:true});
@@ -528,7 +584,7 @@
         var left=document.createElement('div');
         left.innerHTML='<div><b>/'+id+'</b></div><div class="roomId">#'+id+'</div>';
         var actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px'; actions.style.alignItems='center';
-        var openBtn=document.createElement('button'); openBtn.className='btn'; openBtn.textContent='Открыть'; openBtn.onclick=function(){ location.hash=id; location.reload(); };
+        var openBtn=document.createElement('button'); openBtn.className='btn'; openBtn.textContent='Открыть'; openBtn.onclick=function(){ location.href = '/canvas/'+id+(location.hash||''); };
         var delBtn=document.createElement('button'); delBtn.className='roomDelBtn'; delBtn.title='Удалить страницу'; delBtn.setAttribute('data-room-id', id);
         delBtn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>';
         actions.appendChild(openBtn); actions.appendChild(delBtn);
@@ -536,7 +592,7 @@
         roomsList.appendChild(row);
       });
     }
-    newBtn.addEventListener('click', async function(){ try{ const r=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId})}); if(!r.ok) throw 0; const data=await r.json(); addMyRoomLocal(data.roomId); location.hash=data.roomId; location.reload(); }catch(e){ alert('Не удалось создать страницу'); } });
+    newBtn.addEventListener('click', async function(){ try{ const r=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId})}); if(!r.ok) throw 0; const data=await r.json(); addMyRoomLocal(data.roomId); location.href = '/canvas/'+data.roomId+(location.hash||''); }catch(e){ alert('Не удалось создать страницу'); } });
     roomsBtn.addEventListener('click', function(e){ roomsWrap.classList.toggle('open'); if(roomsWrap.classList.contains('open')) refreshRoomsList(); e.stopPropagation(); });
     document.addEventListener('click', function(){ roomsWrap.classList.remove('open'); });
     (function(){ // confirm delete
@@ -607,31 +663,8 @@
     // Init
     function fitCanvasStart(){ var dpr=getDPR(), w=innerWidth, h=innerHeight; c.width=Math.floor(w*dpr); c.height=Math.floor(h*dpr); c.style.width=w+'px'; c.style.height=h+'px'; redraw(); }
     fitCanvasStart();
-  </script>
-
-  <!-- Landing toggler (after app code, minimal & safe) -->
-  <script>
-    (function(){
-      var appEl=document.getElementById('app');
-      var landingEl=document.getElementById('landing');
-      var openDemoBtn=document.getElementById('openDemo');
-      var newPrivateOnLanding=document.getElementById('openPrivate');
-
-      function showLanding(){ if(appEl) appEl.style.display='none'; if(landingEl) landingEl.style.display='block'; }
-      function showApp(){ if(landingEl) landingEl.style.display='none'; if(appEl) appEl.style.display='block'; if(!location.hash) location.hash='demo'; }
-
-      if (!location.hash) showLanding(); else showApp();
-
-      if (openDemoBtn) openDemoBtn.addEventListener('click', function(){ location.hash = 'demo'; showApp(); });
-
-      if (newPrivateOnLanding) {
-        newPrivateOnLanding.addEventListener('click', async function(){
-          try{ const r=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId})});
-            if(!r.ok) throw 0; const data=await r.json(); location.hash=data.roomId; showApp();
-          } catch(e){ alert('Не удалось создать страницу'); }
-        });
-      }
-    })();
+    applyViewFromHash();
+    scheduleHashUpdate();
   </script>
 </body>
 </html>

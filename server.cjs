@@ -1,230 +1,325 @@
-// Pikso server.cjs — безопасная загрузка/сохранение комнат + все актуальные фичи
-const fs = require('fs');
+/* server.cjs — Pikso MVP (CommonJS)
+ * Node.js + Express + Socket.IO
+ * Статика: /public, персист: data/rooms.json
+ */
+
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
-
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-
+const PORT = process.env.PORT ? Number(process.env.PORT) : 3101;
+const MOD_PASSWORD = process.env.MOD_PASSWORD || '';
 const DATA_DIR = path.join(__dirname, 'data');
 const ROOMS_FILE = path.join(DATA_DIR, 'rooms.json');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-if (!fs.existsSync(ROOMS_FILE)) fs.writeFileSync(ROOMS_FILE, JSON.stringify({ rooms: {} }, null, 2));
 
-// --- robust load ---
-function safeLoadRooms() {
-  try {
-    const raw = fs.readFileSync(ROOMS_FILE, 'utf8') || '';
-    if (!raw.trim()) return {};
-    const parsed = JSON.parse(raw);
-    // поддерживаем оба формата: {rooms:{...}} и просто {...}
-    if (parsed && typeof parsed === 'object') {
-      if (parsed.rooms && typeof parsed.rooms === 'object') return parsed.rooms;
-      return parsed;
+// ---------- Persistence ----------
+let rooms = [];
+
+function rebuildIndex() {
+  roomIndex.clear();
+  for (const r of rooms) roomIndex.set(r.roomId, r);
+}
+
+let saveTimer = null;
+function saveRooms(nextState, immediate = false) {
+  if (Array.isArray(nextState)) {
+    rooms = nextState;
+    rebuildIndex();
+  }
+  const doWrite = () => {
+    try {
+      const payload = JSON.stringify({ rooms }, null, 2);
+      fs.writeFileSync(ROOMS_FILE, payload, 'utf8');
+    } catch (e) {
+      console.error('[persist] write error:', e);
     }
-  } catch (e) {
-    console.warn('[persist] rooms.json corrupted, starting fresh:', e.message);
-  }
-  return {};
+  };
+  if (immediate) return doWrite();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(doWrite, 300);
 }
 
-let rooms = safeLoadRooms();
-console.log(`[persist] loaded ${Object.keys(rooms).length} rooms`);
-
-function saveRooms() {
+function loadRooms() {
   try {
-    if (!rooms || typeof rooms !== 'object') rooms = {};
-    fs.writeFileSync(ROOMS_FILE, JSON.stringify({ rooms }, null, 2));
+    const raw = fs.readFileSync(ROOMS_FILE, 'utf8');
+    const json = JSON.parse(raw);
+    if (!json || !Array.isArray(json.rooms)) throw 0;
+    rooms = json.rooms;
+    rebuildIndex();
+    console.log(`[persist] loaded ${rooms.length} rooms]`);
   } catch (e) {
-    console.error('[persist] save error:', e.message);
+    rooms = [{ roomId: 'demo', ownerClientId: 'demo', strokes: [], moderators: [] }];
+    saveRooms(rooms, true);
+    console.log('[persist] initialized with 1 demo room]');
   }
 }
 
-function uid(n = 10) { return Math.random().toString(36).slice(2, 2 + n); }
-function now() { return Date.now(); }
-
-function getOrCreateRoom(roomId, ownerClientId = null) {
-  if (!rooms || typeof rooms !== 'object') rooms = {}; // страховка
-  if (!rooms[roomId]) {
-    rooms[roomId] = {
-      id: roomId,
-      ownerClientId: ownerClientId || null,
-      createdAt: now(),
-      updatedAt: now(),
-      strokes: [],
-      undo: [],
-      members: {},    // clientId -> {name,color}
-      moderators: [], // {clientId,name}
-    };
-    saveRooms();
-  }
-  return rooms[roomId];
+function uid(len = 10) {
+  return Math.random().toString(36).slice(2, 2 + len);
 }
+function newRoomId() { return 'r-' + uid(10); }
 
-// -------------------- REST --------------------
+// room index
+const roomIndex = new Map();
+loadRooms();
+
+// ---------- Express ----------
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: true, credentials: true } });
+
+app.use(express.json({ limit: '1mb' }));
+
+// Статика
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Главная (лендинг)
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// SPA fallback для /canvas/*
+app.get(['/canvas', '/canvas/:id'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// health
+app.get('/health', (req, res) => res.json({ ok: true, rooms: rooms.length }));
+
+// ---------- REST: приватные комнаты ----------
+app.post('/api/rooms', (req, res) => {
+  const clientId = (req.body && String(req.body.clientId || '').trim()) || '';
+  if (!clientId) return res.status(400).json({ error: 'clientId required' });
+  const roomId = newRoomId();
+  const room = { roomId, ownerClientId: clientId, strokes: [], moderators: [] };
+  rooms.unshift(room);
+  saveRooms(rooms);
+  res.json({ roomId });
+});
+
 app.get('/api/rooms', (req, res) => {
-  const owner = (req.query.ownerClientId || '').trim();
+  const owner = (req.query && String(req.query.ownerClientId || '').trim()) || '';
   if (!owner) return res.json({ rooms: [] });
-  const list = Object.values(rooms)
-    .filter(r => r.ownerClientId === owner)
-    .map(r => ({ roomId: r.id }));
+  const list = rooms.filter(r => r.ownerClientId === owner).map(r => ({ roomId: r.roomId }));
   res.json({ rooms: list });
 });
 
-app.post('/api/rooms', (req, res) => {
-  try {
-    const ownerClientId = (req.body && req.body.clientId) || null;
-    const roomId = 'r-' + uid(10);
-    getOrCreateRoom(roomId, ownerClientId);
-    saveRooms();
-    return res.status(201).json({ roomId });
-  } catch (e) {
-    return res.status(500).json({ error: 'fail' });
-  }
+app.delete('/api/rooms/:roomId', (req, res) => {
+  const roomId = String(req.params.roomId || '').trim();
+  const clientId = (req.body && String(req.body.clientId || '').trim()) || '';
+  const room = roomIndex.get(roomId);
+  if (!room) return res.status(404).json({ error: 'not found' });
+  if (!clientId || room.ownerClientId !== clientId) return res.status(403).json({ error: 'forbidden' });
+  rooms = rooms.filter(r => r.roomId !== roomId);
+  saveRooms(rooms);
+  try { io.to(roomId).emit('cleared'); } catch (_) {}
+  res.status(204).end();
 });
 
-app.delete('/api/rooms/:id', (req, res) => {
-  const id = req.params.id;
-  const cid = (req.body && req.body.clientId) || '';
-  const r = rooms[id];
-  if (!r) return res.status(404).json({ error: 'not_found' });
-  if (r.ownerClientId && r.ownerClientId !== cid) return res.status(403).json({ error: 'forbidden' });
-  delete rooms[id];
-  saveRooms();
-  res.json({ ok: true });
-});
+// ---------- Socket.IO ----------
+// members & redo stacks per room
+const membersByRoom = new Map();
+const redoStacks = new Map();
+function ensureRoomStructures(roomId) {
+  if (!membersByRoom.has(roomId)) membersByRoom.set(roomId, new Map());
+  if (!redoStacks.has(roomId)) redoStacks.set(roomId, new Map());
+}
+function listMembers(roomId) {
+  const map = membersByRoom.get(roomId);
+  if (!map) return [];
+  return Array.from(map.values());
+}
+function broadcastMembers(roomId) {
+  io.to(roomId).emit('members', listMembers(roomId));
+}
 
-// ------------------- SOCKETS -------------------
 io.on('connection', (socket) => {
-  let current = { roomId: null, clientId: null };
-
   socket.on('join', ({ roomId, clientId }) => {
-    current = { roomId, clientId };
+    if (!roomId) roomId = 'demo';
+    let room = roomIndex.get(roomId);
+    if (!room) {
+      room = { roomId, ownerClientId: '', strokes: [], moderators: [] };
+      rooms.unshift(room);
+      saveRooms(rooms);
+    }
     socket.join(roomId);
-    const room = getOrCreateRoom(roomId);
-    io.to(socket.id).emit('init', {
-      strokes: room.strokes,
-      ownerClientId: room.ownerClientId,
-      moderators: room.moderators,
-      members: Object.entries(room.members).map(([cid, v]) => ({ clientId: cid, ...v })),
+    ensureRoomStructures(roomId);
+    // register member
+    const m = membersByRoom.get(roomId);
+    const rec = m.get(socket.id) || { name: 'Гость', color: '#0F8FFF' };
+    if (clientId) rec.clientId = String(clientId);
+    m.set(socket.id, rec);
+    broadcastMembers(roomId);
+    socket.emit('init', {
+      strokes: room.strokes || [],
+      ownerClientId: room.ownerClientId || '',
+      moderators: room.moderators || [],
+      members: listMembers(roomId)
     });
   });
 
-  socket.on('presence', ({ roomId, name, color }) => {
-    const room = getOrCreateRoom(roomId);
-    room.members[current.clientId] = { name, color };
-    io.to(roomId).emit('members', Object.entries(room.members).map(([cid, v]) => ({ clientId: cid, ...v })));
-    saveRooms();
+  socket.on('presence', ({ roomId, name, color } = {}) => {
+    if (!roomId) return;
+    ensureRoomStructures(roomId);
+    const m = membersByRoom.get(roomId);
+    const rec = m.get(socket.id) || {};
+    if (name) rec.name = String(name);
+    if (color) rec.color = String(color);
+    m.set(socket.id, rec);
+    broadcastMembers(roomId);
   });
 
-  socket.on('cursor', (p) => { p.clientId = current.clientId; io.to(current.roomId).emit('cursor', p); });
-
-  // live previews
-  socket.on('stroke-begin', ({ roomId, tempId, color, size, point }) => {
-    io.to(roomId).emit('stroke-begin', { tempId, color, size, point });
+  socket.on('cursor', (payload = {}) => {
+    const { roomId } = payload;
+    if (!roomId) return;
+    ensureRoomStructures(roomId);
+    const m = membersByRoom.get(roomId);
+    const rec = m.get(socket.id) || {};
+    if (payload.name) rec.name = String(payload.name);
+    if (payload.color) rec.color = String(payload.color);
+    if (payload.clientId) rec.clientId = String(payload.clientId);
+    m.set(socket.id, rec);
+    const out = Object.assign({}, payload, { clientId: rec.clientId });
+    socket.to(roomId).emit('cursor', out);
   });
-  socket.on('stroke-progress', ({ roomId, tempId, points }) => {
-    io.to(roomId).emit('stroke-progress', { tempId, points });
+
+  socket.on('stroke-begin', (msg) => {
+    if (!msg || !msg.roomId) return;
+    socket.to(msg.roomId).emit('stroke-begin', msg);
+  });
+  socket.on('stroke-progress', (msg) => {
+    if (!msg || !msg.roomId) return;
+    socket.to(msg.roomId).emit('stroke-progress', msg);
   });
 
-  socket.on('stroke', ({ roomId, stroke, tempId }) => {
-    const room = getOrCreateRoom(roomId);
-    room.strokes.push(stroke);
-    room.undo = []; // сбрасываем стек redo
-    room.updatedAt = now();
-    io.to(roomId).emit('stroke-finish', { tempId });
+  socket.on('stroke', (msg = {}) => {
+    const { roomId, stroke, tempId } = msg;
+    if (!roomId || !stroke || !stroke.id) return;
+    const room = roomIndex.get(roomId);
+    if (!room) return;
+    room.strokes = room.strokes || [];
+    if (!room.strokes.some(s => s.id === stroke.id)) {
+      room.strokes.push(stroke);
+      saveRooms(rooms);
+    }
+    ensureRoomStructures(roomId);
+    const redos = redoStacks.get(roomId);
+    if (stroke.authorId) redos.set(stroke.authorId, []);
+    socket.to(roomId).emit('stroke-finish', { tempId });
     io.to(roomId).emit('stroke', stroke);
-    saveRooms();
   });
 
-  socket.on('delete-stroke', ({ roomId, id }) => {
-    const room = getOrCreateRoom(roomId);
-    const idx = room.strokes.findIndex(s => s.id === id);
+  socket.on('delete-stroke', ({ roomId, id } = {}) => {
+    if (!roomId || !id) return;
+    const room = roomIndex.get(roomId);
+    if (!room) return;
+    const strokes = room.strokes || [];
+    const idx = strokes.findIndex(s => s.id === id);
     if (idx === -1) return;
-    const s = room.strokes[idx];
-    const isMod = room.moderators.some(m => m.clientId === current.clientId);
-    if (s.authorId !== current.clientId && !isMod) {
-      io.to(socket.id).emit('delete-denied');
+    const s = strokes[idx];
+    const m = membersByRoom.get(roomId)?.get(socket.id);
+    const clientId = m && m.clientId;
+    const isMod = Array.isArray(room.moderators) && room.moderators.some(x => x.clientId === clientId);
+    if (s.authorId !== clientId && !isMod) {
+      socket.emit('delete-denied');
       return;
     }
-    room.strokes.splice(idx, 1);
-    room.undo.push({ action: 'delete', stroke: s });
-    room.updatedAt = now();
+    strokes.splice(idx, 1);
+    room.strokes = strokes;
+    saveRooms(rooms);
     io.to(roomId).emit('stroke-deleted', id);
-    saveRooms();
   });
 
   socket.on('undo', (roomId) => {
-    const room = getOrCreateRoom(roomId);
-    if (room.strokes.length === 0) return;
-    const s = room.strokes.pop();
-    room.undo.push({ action: 'add', stroke: s });
-    io.to(roomId).emit('stroke-deleted', s.id);
-    saveRooms();
+    if (!roomId) return;
+    const room = roomIndex.get(roomId);
+    if (!room) return;
+    const m = membersByRoom.get(roomId)?.get(socket.id);
+    const clientId = m && m.clientId;
+    if (!clientId) return;
+    const strokes = room.strokes || [];
+    for (let i = strokes.length - 1; i >= 0; i--) {
+      if (strokes[i].authorId === clientId) {
+        const removed = strokes.splice(i, 1)[0];
+        ensureRoomStructures(roomId);
+        const redos = redoStacks.get(roomId);
+        const stack = redos.get(clientId) || [];
+        stack.push(removed);
+        redos.set(clientId, stack);
+        saveRooms(rooms);
+        io.to(roomId).emit('stroke-deleted', removed.id);
+        return;
+      }
+    }
   });
 
   socket.on('redo', (roomId) => {
-    const room = getOrCreateRoom(roomId);
-    const last = room.undo.pop();
-    if (!last) return;
-    if (last.action === 'add') {
-      room.strokes.push(last.stroke);
-      io.to(roomId).emit('stroke', last.stroke);
-    } else if (last.action === 'delete') {
-      const id = last.stroke.id;
-      const idx = room.strokes.findIndex(s => s.id === id);
-      if (idx !== -1) room.strokes.splice(idx, 1);
-      io.to(roomId).emit('stroke-deleted', id);
-    }
-    saveRooms();
+    if (!roomId) return;
+    const room = roomIndex.get(roomId);
+    if (!room) return;
+    const m = membersByRoom.get(roomId)?.get(socket.id);
+    const clientId = m && m.clientId;
+    if (!clientId) return;
+    ensureRoomStructures(roomId);
+    const redos = redoStacks.get(roomId);
+    const stack = redos.get(clientId) || [];
+    const s = stack.pop();
+    if (!s) return;
+    room.strokes = room.strokes || [];
+    room.strokes.push(s);
+    redos.set(clientId, stack);
+    saveRooms(rooms);
+    io.to(roomId).emit('stroke-restored', s);
   });
 
   socket.on('clear', (roomId) => {
-    const room = getOrCreateRoom(roomId);
-    const isMod = room.moderators.some(m => m.clientId === current.clientId);
-    const isOwner = room.ownerClientId && room.ownerClientId === current.clientId;
-    if (!(isMod || isOwner)) {
-      io.to(socket.id).emit('clear-denied');
+    if (!roomId) return;
+    const room = roomIndex.get(roomId);
+    if (!room) return;
+    const m = membersByRoom.get(roomId)?.get(socket.id);
+    const clientId = m && m.clientId;
+    const isOwner = !!(clientId && room.ownerClientId === clientId);
+    const isMod = Array.isArray(room.moderators) && room.moderators.some(x => x.clientId === clientId);
+    if (!isOwner && !isMod) {
+      socket.emit('clear-denied');
       return;
     }
     room.strokes = [];
-    room.undo = [];
+    saveRooms(rooms);
     io.to(roomId).emit('cleared');
-    saveRooms();
   });
 
-  socket.on('set-moderator', ({ roomId, value }) => {
-    const room = getOrCreateRoom(roomId);
-    if (value) {
-      if (!room.moderators.some(m => m.clientId === current.clientId)) {
-        const info = room.members[current.clientId] || { name: 'Гость' };
-        room.moderators.push({ clientId: current.clientId, name: info.name || 'Гость' });
-      }
-    } else {
-      room.moderators = room.moderators.filter(m => m.clientId !== current.clientId);
-    }
-    io.to(socket.id).emit('moderator-set', { value });
+  socket.on('set-moderator', ({ roomId, password, clientId, value } = {}) => {
+    if (!roomId || !clientId) return;
+    if (!MOD_PASSWORD || password !== MOD_PASSWORD) return;
+    const room = roomIndex.get(roomId);
+    if (!room) return;
+    room.moderators = Array.isArray(room.moderators) ? room.moderators : [];
+    const exists = room.moderators.some(x => x.clientId === clientId);
+    if (value && !exists) room.moderators.push({ clientId });
+    if (!value && exists) room.moderators = room.moderators.filter(x => x.clientId !== clientId);
+    saveRooms(rooms);
     io.to(roomId).emit('moderators', room.moderators);
-    saveRooms();
+    io.to(roomId).emit('moderator-set', { clientId, value: !!value });
   });
 
-  socket.on('disconnect', () => {
-    if (!current.roomId || !current.clientId) return;
-    const room = getOrCreateRoom(current.roomId);
-    delete room.members[current.clientId];
-    io.to(current.roomId).emit('members', Object.entries(room.members).map(([cid, v]) => ({ clientId: cid, ...v })));
-    saveRooms();
+  socket.on('disconnecting', () => {
+    for (const roomId of socket.rooms) {
+      if (roomId === socket.id) continue;
+      const map = membersByRoom.get(roomId);
+      if (map) {
+        map.delete(socket.id);
+        broadcastMembers(roomId);
+      }
+    }
   });
 });
 
-const PORT = process.env.PORT || 3000;
+// ---------- Start ----------
 server.listen(PORT, () => {
-  console.log(`Pikso listening on :${PORT}`);
+  console.log(`Pikso server listening on http://localhost:${PORT}`);
 });
