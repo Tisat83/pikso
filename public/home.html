@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pikso — онлайн-доска</title>
+  <link rel="preload" as="image" href="/img/board.jpg">
+  <link rel="stylesheet" href="/landing.css">
+  <script>
+    (function(){
+      const prefTheme = localStorage.getItem('pikso:theme') || 'light';
+      if (prefTheme === 'dark') document.documentElement.classList.add('dark');
+      const lang = localStorage.getItem('pikso:lang') || 'ru';
+      document.documentElement.setAttribute('lang', lang);
+    })();
+  </script>
+  <!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+    (function(m,e,t,r,i,k,a){
+        m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+    })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=104905212', 'ym');
+
+    ym(104905212, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", accurateTrackBounce:true, trackLinks:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/104905212" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->
+</head>
+<body class="landing-only">
+  <header class="landing-header fade-in">
+    <a class="landing-logo" href="/" aria-label="Pikso">
+      <img class="logo-light" src="/img/logo-white.png" alt="Pikso logo light">
+      <img class="logo-dark"  src="/img/logo-black.png"  alt="Pikso logo dark">
+    </a>
+    <div class="landing-actions">
+      <!-- Login / Sign up -->
+      <button id="authBtn" class="btn icon" title="Вход / Регистрация" aria-label="Вход или регистрация">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </button>
+      <button id="langBtn" class="btn icon" title="Language / Язык" aria-label="Переключить язык">
+        <span id="langLabel">RU</span>
+      </button>
+      <button id="themeBtn" class="btn icon" title="Тема: светлая/тёмная" aria-label="Переключить тему">
+        <svg class="icon-sun" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+        </svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none" aria-hidden="true">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="landing-hero">
+    <section class="hero-head fade-up">
+      <!-- Новый заголовок и подзаголовок -->
+      <h1 class="landing-title" data-i18n="title">Рисуй. Объясняй. Создавай. Вместе.</h1>
+      <p class="landing-sub" data-i18n="subtitle">Pikso — онлайн-сервис для визуального общения и совместных идей</p>
+
+      <div class="cta row">
+        <button id="openDemo" class="btn xxl primary" data-i18n="openDemo">Открыть демо-доску</button>
+        <button id="openPrivate" class="btn xxl ghost" data-i18n="createBoard">Создать доску</button>
+      </div>
+    </section>
+
+    <aside class="hero-card fade-up delay-1">
+      <img src="/img/board.jpg" alt="Совместная работа у доски">
+    </aside>
+
+    <!-- Обновлённый текст под картинкой -->
+    <p class="landing-cta fade-up delay-2" data-i18n="cta">
+      Участвуйте в визуальных онлайн дискуссиях, создавайте приватные доски и делитесь ими с друзьями или коллегами.
+      <strong>Бесплатно и без регистрации!</strong>
+    </p>
+
+    <!-- Краткие преимущества -->
+    <section class="benefits-grid fade-up delay-3">
+      <article class="benefit">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16M12 4v16" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        <h3 data-i18n="b1t">Реальное время</h3>
+        <p data-i18n="b1d">Рисуйте и видьте курсоры друг друга мгновенно.</p>
+      </article>
+      <article class="benefit">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 7h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2в2" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <h3 data-i18n="b2t">Приватность</h3>
+        <p data-i18n="b2d">Создавайте приватные страницы и делитесь ссылкой.</p>
+      </article>
+      <article class="benefit">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 6h18" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2в2" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M10 11в6M14 11в6" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <h3 data-i18n="b3t">Контроль</h3>
+        <p data-i18n="b3d">Ластик с правами, undo/redo и модерация.</p>
+      </article>
+      <article class="benefit">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M12 15V3" fill="none" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <h3 data-i18n="b4t">Экспорт</h3>
+        <p data-i18n="b4d">Сохраняйте доски в PNG или PDF.</p>
+      </article>
+    </section>
+
+    <!-- Сравнение планов -->
+    <section class="plans fade-up delay-3" aria-labelledby="plans-title">
+      <h2 id="plans-title" class="plans-title">Возможности для пользователя<span class="star">*</span></h2>
+      <div class="plans-wrap">
+        <table class="plans-table">
+          <thead>
+            <tr>
+              <th>Возможность</th>
+              <th>Без регистрации</th>
+              <th>Зарегистрирован</th>
+              <th>Индивидуальный</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Создание страниц</td><td>3 шт</td><td>15 шт</td><td>50 шт</td></tr>
+            <tr><td>Срок у страниц</td><td>14 дней</td><td>60 дней</td><td>∞</td></tr>
+            <tr><td>Пригласить на страницу</td><td>+</td><td>+</td><td>+</td></tr>
+            <tr><td>Назначить модератора</td><td>—</td><td>1</td><td>3</td></tr>
+            <tr><td>Скачать холст</td><td>—</td><td>+</td><td>+</td></tr>
+            <tr><td>Бронь имени</td><td>—</td><td>+</td><td>+</td></tr>
+            <tr><td>Своё имя у страницы</td><td>—</td><td>—</td><td>+</td></tr>
+            <tr><td>Загрузка картинки на холст</td><td>—</td><td>—</td><td>+</td></tr>
+            <tr><td>Страница под паролем</td><td>—</td><td>—</td><td>+</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="landing-footer fade-in delay-3">
+    <span class="foot-left">© Pikso <span class="foot-note">* — часть функционала находится в разработке</span></span>
+    <nav class="links">
+      <button id="contactBtn" class="btn icon ghost" title="Обратная связь" aria-label="Обратная связь">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 4h16v16H4z"></path>
+          <path d="M22 6l-10 7L2 6"></path>
+        </svg>
+      </button>
+    </nav>
+  </footer>
+
+  <!-- Contact form modal -->
+  <div id="contactModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="contactTitle">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="document">
+      <button class="modal-close" type="button" aria-label="Закрыть" data-close>×</button>
+      <h3 id="contactTitle" class="modal-title">Напишите нам</h3>
+      <form id="contactForm" class="modal-form">
+        <label class="field">
+          <span>Имя</span>
+          <input type="text" name="name" required placeholder="Ваше имя">
+        </label>
+        <label class="field">
+          <span>E-mail</span>
+          <input type="email" name="email" required placeholder="you@example.com">
+        </label>
+        <label class="field">
+          <span>Сообщение</span>
+          <textarea name="message" required rows="4" placeholder="Текст сообщения"></textarea>
+        </label>
+        <p class="hint">Присылайте ваши пожелания и предложения по улучшению проекта.</p>
+        <div class="actions">
+          <button type="submit" class="btn primary">Отправить</button>
+          <button type="button" class="btn ghost" data-close>Отмена</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // Переключение темы
+    (function(){
+      const btn = document.getElementById('themeBtn');
+      const sun = btn.querySelector('.icon-sun');
+      const moon = btn.querySelector('.icon-moon');
+      function set(theme){
+        const root = document.documentElement;
+        const dark = theme === 'dark';
+        root.classList.toggle('dark', dark);
+        sun.style.display = dark ? 'none' : 'inline';
+        moon.style.display = dark ? 'inline' : 'none';
+        localStorage.setItem('pikso:theme', theme);
+      }
+      set(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+      btn.addEventListener('click', ()=>{
+        const now = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+        set(now==='dark' ? 'light' : 'dark');
+      });
+    })();
+
+    // i18n RU/EN
+    (function(){
+      const dict = {
+        ru: {
+          title: "Рисуй. Объясняй. Создавай. Вместе.",
+          subtitle: "Pikso — онлайн-сервис для визуального общения и совместных идей",
+          openDemo: "Открыть демо-доску",
+          createBoard: "Создать доску",
+          cta: "Участвуйте в визуальных онлайн дискуссиях, создавайте приватные доски и делитесь ими с друзьями или коллегами. <strong>Бесплатно и без регистрации!</strong>",
+          b1t: "Реальное время", b1d: "Рисуйте и видьте курсоры друг друга мгновенно.",
+          b2t: "Приватность", b2d: "Создавайте приватные страницы и делитесь ссылкой.",
+          b3t: "Контроль", b3d: "Ластик с правами, undo/redo и модерация.",
+          b4t: "Экспорт", b4d: "Сохраняйте доски в PNG или PDF."
+        },
+        en: {
+          title: "Draw. Explain. Create. Together.",
+          subtitle: "Pikso — visual collaboration for teams and friends",
+          openDemo: "Open demo board",
+          createBoard: "Create a board",
+          cta: "Join visual discussions, create private boards and share with friends or colleagues. <strong>Free and no sign-up!</strong>",
+          b1t: "Real-time", b1d: "Draw together and see cursors instantly.",
+          b2t: "Privacy",  b2d: "Create private rooms and share a link.",
+          b3t: "Control",  b3d: "Eraser permissions, undo/redo and moderation.",
+          b4t: "Export",   b4d: "Save boards as PNG or PDF."
+        }
+      };
+      function apply(lang){
+        document.querySelectorAll('[data-i18n]').forEach(el=>{
+          const key = el.getAttribute('data-i18n');
+          if(!dict[lang] || !dict[lang][key]) return;
+          if(el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = dict[lang][key];
+          else el.innerHTML = dict[lang][key];
+        });
+        document.documentElement.setAttribute('lang', lang);
+        localStorage.setItem('pikso:lang', lang);
+        document.getElementById('langLabel').textContent = lang.toUpperCase();
+      }
+      const btn = document.getElementById('langBtn');
+      const lang = localStorage.getItem('pikso:lang') || 'ru';
+      apply(lang);
+      btn.addEventListener('click', ()=>{
+        const current = localStorage.getItem('pikso:lang') || 'ru';
+        apply(current === 'ru' ? 'en' : 'ru');
+      });
+    })();
+
+    // CTA переходы
+    (function(){
+      document.getElementById('openDemo').addEventListener('click', ()=>{ location.href='/canvas/demo#0,0,1.00'; });
+      document.getElementById('openPrivate').addEventListener('click', async ()=>{
+        let cid = localStorage.getItem('pikso:clientId');
+        if(!cid){
+          try{
+            cid = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c/4).toString(16));
+            localStorage.setItem('pikso:clientId', cid);
+          }catch(e){}
+        }
+        try{
+          const r = await fetch('/api/rooms', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({clientId: cid||''})});
+          if(!r.ok) throw 0;
+          const data = await r.json();
+          location.href = '/canvas/'+data.roomId+'#0,0,1.00';
+        }catch(e){
+          alert('Не удалось создать страницу');
+        }
+      });
+    })();
+
+    // Contact modal + отправка
+    (function(){
+      const modal = document.getElementById('contactModal');
+      const openBtn = document.getElementById('contactBtn');
+      const form = document.getElementById('contactForm');
+      function open(){
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden','false');
+        document.body.style.overflow='hidden';
+        const first = modal.querySelector('input[name="name"]');
+        if(first) setTimeout(()=>first.focus(), 0);
+      }
+      function close(){
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden','true');
+        document.body.style.overflow='';
+      }
+      openBtn && openBtn.addEventListener('click', open);
+      modal.addEventListener('click', (e)=>{ if(e.target.closest('[data-close]')) close(); });
+      document.addEventListener('keydown', (e)=>{ if(e.key==='Escape' && modal.classList.contains('open')) close(); });
+
+      form.addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const fd = new FormData(form);
+        const payload = {
+          name: (fd.get('name')||'').toString().trim(),
+          email: (fd.get('email')||'').toString().trim(),
+          message: (fd.get('message')||'').toString().trim()
+        };
+        try{
+          const res = await fetch('/api/contact', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(payload)
+          });
+          if(res.ok){
+            close();
+            alert('Спасибо! Мы получили ваше сообщение.');
+            form.reset();
+          }else{
+            // если бекенд ещё не добавлен или вернулась ошибка — старое поведение
+            alert('Спасибо! Мы получили ваше сообщение.');
+            close();
+          }
+        }catch(err){
+          alert('Спасибо! Мы получили ваше сообщение.');
+          close();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

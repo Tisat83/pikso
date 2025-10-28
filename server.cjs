@@ -19,6 +19,9 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 // ---------- Persistence ----------
 let rooms = [];
 
+// room index
+const roomIndex = new Map();
+
 function rebuildIndex() {
   roomIndex.clear();
   for (const r of rooms) roomIndex.set(r.roomId, r);
@@ -63,8 +66,6 @@ function uid(len = 10) {
 }
 function newRoomId() { return 'r-' + uid(10); }
 
-// room index
-const roomIndex = new Map();
 loadRooms();
 
 // ---------- Express ----------
@@ -74,13 +75,13 @@ const io = new Server(server, { cors: { origin: true, credentials: true } });
 
 app.use(express.json({ limit: '1mb' }));
 
-// Статика
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Главная (лендинг)
+// ВАЖНО: сначала явный маршрут главной
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'public', 'home.html'));
 });
+
+// Статика (без авто-индекса, чтобы '/' не отдавал index.html)
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // SPA fallback для /canvas/*
 app.get(['/canvas', '/canvas/:id'], (req, res) => {
@@ -114,16 +115,62 @@ app.delete('/api/rooms/:roomId', (req, res) => {
   const room = roomIndex.get(roomId);
   if (!room) return res.status(404).json({ error: 'not found' });
   if (!clientId || room.ownerClientId !== clientId) return res.status(403).json({ error: 'forbidden' });
+
   rooms = rooms.filter(r => r.roomId !== roomId);
   saveRooms(rooms);
-  try { io.to(roomId).emit('cleared'); } catch (_) {}
+
+  try {
+    io.to(roomId).emit('cleared');
+    io.to(roomId).emit('room-deleted'); // уведомление об удалении
+  } catch (_) {}
+
   res.status(204).end();
+});
+
+// ---------- NEW: feedback (write-to-file only) ----------
+app.post('/api/contact', (req, res) => {
+  const body = req.body || {};
+  const s = v => String(v || '').trim();
+
+  let name = s(body.name).slice(0, 120);
+  let email = s(body.email).slice(0, 200);
+  let message = s(body.message).slice(0, 4000);
+
+  if (!name || !email || !message) {
+    return res.status(400).json({ error: 'invalid' });
+  }
+
+  // минимальная защита от мусора
+  if (email.length < 3 || !email.includes('@')) {
+    return res.status(400).json({ error: 'email' });
+  }
+
+  const entry = {
+    ts: new Date().toISOString(),
+    ip: (req.headers['x-forwarded-for'] || '').toString().split(',')[0].trim() || req.socket.remoteAddress || '',
+    ua: req.headers['user-agent'] || '',
+    name,
+    email,
+    message
+  };
+
+  const FEED_FILE = path.join(DATA_DIR, 'feedback.jsonl');
+  try {
+    fs.appendFileSync(FEED_FILE, JSON.stringify(entry) + '\n', 'utf8');
+  } catch (e) {
+    console.error('[feedback] append error:', e);
+    return res.status(500).json({ error: 'persist-failed' });
+  }
+
+  // Пока почту не шлём — только файл
+  return res.status(202).json({ ok: true, mail: false });
 });
 
 // ---------- Socket.IO ----------
 // members & redo stacks per room
 const membersByRoom = new Map();
 const redoStacks = new Map();
+
 function ensureRoomStructures(roomId) {
   if (!membersByRoom.has(roomId)) membersByRoom.set(roomId, new Map());
   if (!redoStacks.has(roomId)) redoStacks.set(roomId, new Map());

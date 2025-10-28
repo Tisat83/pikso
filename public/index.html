@@ -72,68 +72,11 @@
       background: rgba(17,17,17,.92); color:#fff; padding:10px 14px; border-radius:8px;
       display:none; z-index:4000; font:14px/1 system-ui,Segoe UI,Roboto,Arial;
       box-shadow:0 10px 30px rgba(0,0,0,.25); }
-
-    /* Landing */
-    #landing{display:none;min-height:100%;padding:48px 20px;box-sizing:border-box}
-    body.landing #landing{display:block}
-    body.landing #toolbar,
-    body.landing #c,
-    body.landing .badge,
-    body.landing #downloadModal,
-    body.landing #helpModal,
-    body.landing #authModal,
-    body.landing #confirmModal{display:none !important}
   </style>
-
-  <script>
-  (function(){
-    var onRoot = (location.pathname === '/' || location.pathname === '');
-    var legacy = /^(#r-|#demo)/.test(location.hash);
-    if (onRoot && !legacy){
-      document.documentElement.classList.add('landing-html');
-      document.addEventListener('DOMContentLoaded', function(){ try{ document.body.classList.add('landing'); }catch(e){} });
-      try { history.replaceState = function(){}; } catch(e){}
-    }
-    window.__PIKSO_LANDING__ = onRoot && !legacy;
-  })();
-  </script>
 </head>
 <body>
 
-  <!-- Landing -->
-  <main id="landing">
-    <div style="max-width:980px;margin:0 auto;display:grid;grid-template-columns:1.2fr 0.8fr;gap:24px;align-items:center">
-      <section>
-        <h1 style="font-size:40px;line-height:1.1;margin:0 0 12px">Pikso — онлайн-доска для быстрых эскизов</h1>
-        <p style="color:#6b7280;margin:6px 0 14px">Рисуйте вместе в реальном времени. Приватные страницы и экспорт PNG/PDF.</p>
-        <div style="display:flex;gap:10px;align-items:center">
-          <button id="openDemo" style="padding:12px 16px;border-radius:12px;border:1px solid #0F8FFF;background:#0F8FFF;color:#fff;cursor:pointer;font-weight:600">Открыть демо-доску</button>
-          <button id="openPrivate" style="padding:12px 16px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;color:#111827;cursor:pointer">Новая приватная</button>
-        </div>
-      </section>
-      <aside></aside>
-    </div>
-  </main>
-  <script>
-  (function(){
-    if(!window.__PIKSO_LANDING__) return;
-    const btn1=document.getElementById('openDemo');
-    if(btn1) btn1.addEventListener('click', ()=>{ location.href='/canvas/demo#0,0,1.00'; });
-    const btn2=document.getElementById('openPrivate');
-    if(btn2) btn2.addEventListener('click', async ()=>{
-      let cid = localStorage.getItem('pikso:clientId');
-      if (!cid) { try{ cid=([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,c=>(c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)); localStorage.setItem('pikso:clientId', cid);}catch(e){} }
-      try{
-        const r=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId: cid||''})});
-        if(!r.ok) throw 0;
-        const data=await r.json();
-        location.href='/canvas/'+data.roomId+'#0,0,1.00';
-      }catch(e){ alert('Не удалось создать страницу'); }
-    });
-  })();
-  </script>
-
-  <!-- UI -->
+  <!-- UI (только доска) -->
   <div id="toolbar">
     <input id="name" maxlength="20" placeholder="Имя"/>
     <button id="pen" class="iconbtn active" title="Карандаш (P)">
@@ -145,10 +88,10 @@
 
     <!-- Текст -->
     <button id="text" class="iconbtn" title="Текст (T)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-  <path d="M4 6V4h16v2"/>
-  <path d="M10 20V6"/>
-  <path d="M14 20V6"/>
-</svg></button>
+      <path d="M4 6V4h16v2"/>
+      <path d="M10 20V6"/>
+      <path d="M14 20V6"/>
+    </svg></button>
 
     <button id="gridBtn" class="iconbtn" title="Сетка (G)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg></button>
 
@@ -162,9 +105,7 @@
         <div class="pop-title">Предпросмотр</div>
         <div id="sizeVal" class="pop-val">3</div>
       </div>
-      <div id="sizePreview" class="size-preview">
-        <!-- сюда рисуем точку или слово «пример» -->
-      </div>
+      <div id="sizePreview" class="size-preview"></div>
     </div>
 
     <input id="color" type="color" title="Цвет" class="iconbtn" style="padding:0;height:42px;width:42px;"/>
@@ -285,6 +226,7 @@
     function downloadBlob(blob, filename){ var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download=filename; a.rel='noopener'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url), 1000); }
     function toast(msg){ var t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>{ t.style.display='none'; },1600); }
 
+    // Переключение темы
     (function(){
       const themeBtn=document.getElementById('themeBtn');
       const pref=localStorage.getItem('pikso:theme')||'light';
@@ -514,7 +456,7 @@
     function distToSegment(px,py,x1,y1,x2,y2){ var A=px-x1,B=py-y1,C=x2-x1,D=y2-y1; var dot=A*C+B*D,len=C*C+D*D; var t=len?dot/len:-1; t=Math.max(0,Math.min(1,t)); var xx=x1+C*t, yy=y1+D*t; var dx0=px-xx, dy0=py-yy; return Math.sqrt(dx0*dx0+dy0*dy0); }
     function computeBounds(pad){
       pad=pad||16;
-      var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=Infinity*-1;
       for(var i=0;i<strokes.length;i++){
         var s=strokes[i];
         if(s.type==='text'){
@@ -587,12 +529,30 @@
         var bx=w; if(shiftDown){ var dx0=w.x-a.x, dy0=w.y-a.y; bx=(Math.abs(dx0)>Math.abs(dy0))?{x:w.x,y:a.y}:{x:a.x,y:w.y}; }
         current.points=[clampPointToBoard(a), clampPointToBoard(bx)];
       } else if(activeTool==='rect'){
-        var rb=w; if(shiftDown){ var s=Math.max(Math.abs(w.x-a.x), Math.abs(w.y-a.y)); rb={x:a.x+(w.x>=a.x?s:-s), y:a.y+(w.y>=a.y?s:-s)}; }
-        var pts=[ {x:Math.min(a.x,rb.x), y:Math.min(a.y,rb.y)}, {x:Math.max(a.x,rb.x), y:Math.min(a.y,rb.y)}, {x:Math.max(a.x,rb.x), y:Math.max(a.y,rb.y)}, {x:Math.min(a.x,rb.x), y:Math.max(a.y,rb.y)}, {x:Math.min(a.x,rb.x), y:Math.min(a.y,rb.y)} ];
+        var rb=w; 
+        if(shiftDown){ 
+          var s=Math.max(Math.abs(w.x-a.x), Math.abs(w.y-a.y)); 
+          rb={x:a.x+(w.x>=a.x?s:-s), y:a.y+(w.y>=a.y?s:-s)}; 
+        }
+        var pts=[
+          {x:Math.min(a.x,rb.x), y:Math.min(a.y,rb.y)},
+          {x:Math.max(a.x,rb.x), y:Math.min(a.y,rb.y)},
+          {x:Math.max(a.x,rb.x), y:Math.max(a.y,rb.y)},
+          {x:Math.min(a.x,rb.x), y:Math.max(a.y,rb.y)},
+          {x:Math.min(a.x,rb.x), y:Math.min(a.y,rb.y)}
+        ];
         current.points=pts.map(clampPointToBoard);
       } else if(activeTool==='ellipse'){
-        var eb=w; if(shiftDown){ var s2=Math.max(Math.abs(w.x-a.x), Math.abs(w.y-a.y)); eb={x:a.x+(w.x>=a.x?s2:-s2), y:a.y+(w.y>=a.y?s2:-s2)}; }
-        var cx=(a.x+eb.x)/2, cy=(a.y+eb.y)/2; var rx=Math.abs(eb.x-a.x)/2, ry=Math.abs(eb.y-a.y)/2; var seg=64; var pts=[]; for(var i=0;i<=seg;i++){ var t=(i/seg)*Math.PI*2; pts.push(clampPointToBoard({x:cx+Math.cos(t)*rx, y:cy+Math.sin(t)*ry})); } current.points=pts;
+        var eb=w; 
+        if(shiftDown){ 
+          var s2=Math.max(Math.abs(w.x - a.x), Math.abs(w.y - a.y));
+          eb={x:a.x+(w.x>=a.x?s2:-s2), y:a.y+(w.y>=a.y?s2:-s2)}; 
+        }
+        var cx=(a.x+eb.x)/2, cy=(a.y+eb.y)/2; 
+        var rx=Math.abs(eb.x-a.x)/2, ry=Math.abs(eb.y-a.y)/2; 
+        var seg=64; var pts=[]; 
+        for(var i=0;i<=seg;i++){ var t=(i/seg)*Math.PI*2; pts.push(clampPointToBoard({x:cx+Math.cos(t)*rx, y:cy+Math.sin(t)*ry})); } 
+        current.points=pts;
       }
       socket.emit('stroke-progress',{roomId,tempId:currentTempId,points:current.points});
       redraw();
@@ -811,52 +771,49 @@
     // Список/удаление комнат
     var newBtn=document.getElementById('newPrivate'), roomsBtn=document.getElementById('roomsBtn'), roomsWrap=document.getElementById('roomsWrap'), roomsList=document.getElementById('roomsList');
     function addMyRoomLocal(id){ var key='pikso:myRooms'; var arr=[]; try{arr=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){} if(!arr.includes(id)){arr.unshift(id); localStorage.setItem(key, JSON.stringify(arr.slice(0,100)));} }
+    function removeMyRoomLocal(id){ var key='pikso:myRooms'; var arr=[]; try{arr=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){} arr=arr.filter(x=>x!==id); localStorage.setItem(key, JSON.stringify(arr)); }
     function getMyRoomsLocal(){ try{ return JSON.parse(localStorage.getItem('pikso:myRooms')||'[]'); }catch(e){ return []; } }
     async function fetchMyRoomsServer(){ try{ const r=await fetch('/api/rooms?ownerClientId='+encodeURIComponent(clientId)); if(!r.ok) return []; const d=await r.json(); return (d.rooms||[]).map(x=>x.roomId);}catch(e){return [];} }
     async function refreshRoomsList(){ var local=getMyRoomsLocal(); var server=await fetchMyRoomsServer(); var merged=Array.from(new Set([].concat(server, local))); roomsList.innerHTML=''; if(merged.length===0){ var empty=document.createElement('div'); empty.style.opacity='.7'; empty.style.padding='6px 8px'; empty.textContent='Пока нет приватных страниц'; roomsList.appendChild(empty); return; } merged.forEach(function(id){ var row=document.createElement('div'); row.className='roomRow'; var left=document.createElement('div'); left.innerHTML='<div><b>/'+id+'</b></div><div class="roomId">#'+id+'</div>'; var actions=document.createElement('div'); actions.style.display='flex'; actions.style.gap='6px'; actions.style.alignItems='center'; var openBtn=document.createElement('button'); openBtn.className='btn'; openBtn.textContent='Открыть'; openBtn.onclick=function(ev){ ev.stopPropagation(); location.href='/canvas/'+id+(location.hash||''); }; var delBtn=document.createElement('button'); delBtn.type='button'; delBtn.className='roomDelBtn'; delBtn.title='Удалить страницу'; delBtn.setAttribute('data-room-id', id); delBtn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"></path></svg>'; actions.appendChild(openBtn); actions.appendChild(delBtn); row.appendChild(left); row.appendChild(actions); roomsList.appendChild(row); }); }
+
+    // Обработчик удаления (делегирование)
+    roomsList.addEventListener('click', async function(e){
+      const btn = e.target.closest && e.target.closest('.roomDelBtn');
+      if(!btn) return;
+      e.stopPropagation();
+      const id = btn.getAttribute('data-room-id');
+      const ok = await niceConfirm('Удалить страницу /'+id+'?');
+      if(!ok) return;
+      try{
+        const r = await fetch('/api/rooms/'+encodeURIComponent(id), {
+          method:'DELETE',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify({ clientId })
+        });
+        if(r.status===204){
+          removeMyRoomLocal(id);
+          toast('Страница удалена');
+          refreshRoomsList();
+        } else if(r.status===403){
+          toast('Удалять может только владелец');
+        } else if(r.status===404){
+          toast('Страница не найдена');
+          removeMyRoomLocal(id);
+          refreshRoomsList();
+        } else {
+          toast('Не удалось удалить');
+        }
+      }catch(_){
+        toast('Ошибка соединения');
+      }
+    });
+
     newBtn.addEventListener('click', async function(){ try{ const r=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId})}); if(!r.ok) throw 0; const data=await r.json(); addMyRoomLocal(data.roomId); location.href='/canvas/'+data.roomId+'#0,0,1.00'; }catch(e){ alert('Не удалось создать страницу'); } });
     roomsBtn.addEventListener('click', function(e){ roomsWrap.classList.toggle('open'); if(roomsWrap.classList.contains('open')) refreshRoomsList(); e.stopPropagation(); });
     document.addEventListener('click', function(){ roomsWrap.classList.remove('open'); });
 
-    // Удаление с фолбэком (DELETE body → DELETE query)
-    roomsList.addEventListener('click', async function(e){
-      var btn = e.target.closest('.roomDelBtn');
-      if(!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      var id = btn.getAttribute('data-room-id');
-      if(!id) return;
-      var ok = await niceConfirm('Удалить страницу '+id+'?');
-      if(!ok) return;
-
-      async function tryDeleteBody(){
-        return fetch('/api/rooms/'+encodeURIComponent(id), {
-          method:'DELETE',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ clientId })
-        });
-      }
-      async function tryDeleteQuery(){
-        return fetch('/api/rooms/'+encodeURIComponent(id)+'?clientId='+encodeURIComponent(clientId), {
-          method:'DELETE'
-        });
-      }
-
-      try{
-        let r = await tryDeleteBody();
-        if(!r.ok) r = await tryDeleteQuery();
-        if(!r.ok) throw 0;
-        // локальный список
-        var arr = getMyRoomsLocal(); var ix = arr.indexOf(id); if(ix>-1){ arr.splice(ix,1); localStorage.setItem('pikso:myRooms', JSON.stringify(arr)); }
-        // удалить строку
-        btn.closest('.roomRow')?.remove();
-        toast('Страница удалена');
-      }catch(err){
-        alert('Удаление не удалось. Доступ только у владельца.');
-      }
-    });
-
     // Инициализация вида
+    function setCanvasSize(){ var dpr=getDPR(), w=innerWidth, h=innerHeight; c.width=Math.floor(w*dpr); c.height=Math.floor(h*dpr); c.style.width=w+'px'; c.style.height=h+'px'; }
     setCanvasSize();
     if (!applyViewFromHash()) {
       scale=1; dx=0; dy=0; clampViewToBoard(); history.replaceState(null,'', location.pathname+'#0,0,1.00');
@@ -877,6 +834,7 @@
     socket.on('stroke-deleted', function(id){ for (var i = strokes.length - 1; i >= 0; i--) { if (strokes[i].id === id) { strokes.splice(i,1); } } redraw(); });
     socket.on('stroke-restored', function(s){ if(!s) return; var exists=strokes.some(x=>x.id===s.id); if(!exists){ strokes.push(s);} redraw(); });
     socket.on('cleared', function(){ strokes=[]; redraw(); });
+    socket.on('room-deleted', function(){ toast('Страница удалена владельцем'); }); /* событие от сервера */
     socket.on('delete-denied', function(){ toast(iAmModerator ? 'Ошибка удаления' : 'Нельзя стирать чужие штрихи'); });
     socket.on('clear-denied', function(){ toast('Недостаточно прав для очистки'); });
 
