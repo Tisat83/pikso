@@ -1,4 +1,5 @@
 // public/js/canvas/tools.js
+// Кистевой ластик: радиус = size (world). Визуальный круг = 2*size*scale (px).
 import { state } from '../state.js';
 import { clamp } from '../util.js';
 import { toWorld, clampPointToBoard, isInsideBoard } from './view.js';
@@ -54,14 +55,15 @@ export function updateCursor(){
   const c = state.c;
   if(state.activeTool==='eraser'){
     if(!state.lastWorld || !isInsideBoard(state.lastWorld)){ c.style.cursor='not-allowed'; return; }
-    if(state.hoverHasStroke){ c.style.cursor = state.hoverDeletable ? 'pointer' : 'not-allowed'; } else { c.style.cursor = 'cell'; }
-  } else if(state.activeTool==='text'){
+    c.style.cursor='none'; // рисуем свой круг
+  }else if(state.activeTool==='text'){
     c.style.cursor = (!state.lastWorld || !isInsideBoard(state.lastWorld)) ? 'not-allowed' : 'text';
-  } else {
+  }else{
     c.style.cursor = (!state.lastWorld || !isInsideBoard(state.lastWorld)) ? 'not-allowed' : 'crosshair';
   }
 }
 
+// Нужна для импорта в main.js (подсветки/ховеры и т.п.). Оставляем как было.
 export function findTargetStrokeAt(x,y,r){
   for(let i=state.strokes.length-1;i>=0;i--){
     const s=state.strokes[i];
@@ -81,17 +83,13 @@ export function distToSegment(px,py,x1,y1,x2,y2){
   const A=px-x1,B=py-y1,C=x2-x1,D=y2-y1; const dot=A*C+B*D,len=C*C+D*D; let t=len?dot/len:-1;
   t=Math.max(0,Math.min(1,t)); const xx=x1+C*t, yy=y1+D*t; const dx0=px-xx, dy0=py-yy; return Math.sqrt(dx0*dx0+dy0*dy0);
 }
-
-export function clampWorldPoint(p){ return clampPointToBoard({ x: clamp(p.x, state.BOARD.minX, state.BOARD.maxX), y: clamp(p.y, state.BOARD.minY, state.BOARD.maxY) }); }
-
+export function clampWorldPoint(p){ return { x: clamp(p.x, state.BOARD.minX, state.BOARD.maxX), y: clamp(p.y, state.BOARD.minY, state.BOARD.maxY) }; }
 export function textFontPx(){ return Math.max(8, (+state.sizeEl.value||3)*4); }
 
 export function showTextInput(clientX, clientY, worldPoint){
   window.__textInputOpen = true;
   const input=document.createElement('input');
-  input.type='text';
-  input.placeholder='Текст';
-  input.id='pikso-text-input';
+  input.type='text'; input.placeholder='Текст'; input.id='pikso-text-input';
   input.style.position='fixed';
   const pad=8, x=Math.max(pad, Math.min(clientX, innerWidth-220)), y=Math.max(pad, Math.min(clientY, innerHeight-40));
   input.style.left=x+'px'; input.style.top=y+'px'; input.style.transform='translate(-2px,-18px)';
@@ -115,24 +113,35 @@ export function showTextInput(clientX, clientY, worldPoint){
   input.addEventListener('blur', ()=>commit(true));
 }
 
+// === КИСТЕВОЙ ЛАСТИК (эмитим только erase-circle) ===
 export function eraseAt(clientX, clientY){
-  const w = toWorld(clientX, clientY), r = 1/state.scale;
+  const w = toWorld(clientX, clientY);
   if(!isInsideBoard(w)) return;
-  for(let i=state.strokes.length-1;i>=0;i--){
-    const s=state.strokes[i];
-    if(s.type==='text'){
-      const px=s.font||16; const wtxt=(s.text||'').length*px*0.6, h=px;
-      if(w.x>=s.x && w.x<=s.x+wtxt && w.y>=s.y && w.y<=s.y+h){
-        if(s.authorId!==state.clientId && !state.iAmModerator){ updateCursor(); return; }
-        state.socket.emit('delete-stroke', {roomId: state.roomId, id: s.id}); return;
-      }
-      continue;
-    }
-    for(let j=1;j<s.points.length;j++){
-      if(distToSegment(w.x,w.y,s.points[j-1].x,s.points[j-1].y,s.points[j].x,s.points[j].y) <= (s.size*0.6 + r)){
-        if(s.authorId!==state.clientId && !state.iAmModerator){ updateCursor(); return; }
-        state.socket.emit('delete-stroke', {roomId: state.roomId, id: s.id}); return;
-      }
-    }
-  }
+  const radius = (+state.sizeEl.value || 3); // world units
+  if (state.socket) state.socket.emit('erase-circle', { roomId: state.roomId, x: w.x, y: w.y, radius });
 }
+
+// Визуальный кружок — экранный диаметр = 2 * radius_world * scale
+let circleDiv;
+function ensureCircle(){
+  if(circleDiv) return circleDiv;
+  circleDiv=document.createElement('div');
+  circleDiv.style.position='fixed';
+  circleDiv.style.pointerEvents='none';
+  circleDiv.style.border='1px dashed var(--fg)';
+  circleDiv.style.borderRadius='50%';
+  circleDiv.style.opacity='0.85';
+  circleDiv.style.zIndex='9999';
+  document.body.appendChild(circleDiv);
+  return circleDiv;
+}
+export function showBrushAt(clientX, clientY){
+  if(state.activeTool!=='eraser'){ if(circleDiv) circleDiv.style.display='none'; return; }
+  const radiusWorld=(+state.sizeEl.value||3);
+  const d=Math.max(4, 2*radiusWorld*state.scale);
+  const el=ensureCircle();
+  el.style.width=d+'px'; el.style.height=d+'px';
+  el.style.left=(clientX-d/2)+'px'; el.style.top=(clientY-d/2)+'px';
+  el.style.display='block';
+}
+export function hideBrush(){ if(circleDiv) circleDiv.style.display='none'; }

@@ -1,4 +1,4 @@
-// Socket.IO wiring + службы домена
+// Socket.IO wiring + доменные сервисы (пиксельный ластик + таймлайн)
 const { Server } = require('socket.io');
 const createRoomsService = require('../services/rooms.cjs');
 const createMembersService = require('../services/members.cjs');
@@ -14,103 +14,76 @@ module.exports = function initSockets({
 }) {
   const io = new Server(server, { cors: { origin: true, credentials: true } });
 
-  // Сервисы домена
   const roomsSvc = createRoomsService({
-    roomIndex,
-    getRooms,
-    setRooms,
-    saveRooms: () => saveRooms(getRooms()),
+    roomIndex, getRooms, setRooms, saveRooms,
     newRoomId: () => 'r-' + Math.random().toString(36).slice(2, 12),
   });
-
   const membersSvc = createMembersService({ io });
-
-  const strokesSvc = createStrokesService({
-    saveRooms: () => saveRooms(getRooms()),
-  });
+  const strokesSvc = createStrokesService({ saveRooms });
 
   io.on('connection', (socket) => {
     socket.on('join', ({ roomId, clientId }) => {
-      roomId = roomId || 'demo';
+      if (!roomId || !clientId) return;
       const room = roomsSvc.ensureRoom(roomId);
-
       socket.join(roomId);
-      membersSvc.ensureRoom(roomId);
-
-      const rec = membersSvc.setPresence(roomId, socket.id, { clientId });
-      if (!rec.name)  rec.name  = 'Гость';
-      if (!rec.color) rec.color = '#0F8FFF';
-      membersSvc.broadcast(roomId);
-
+      membersSvc.setPresence(roomId, socket.id, { clientId, name: 'Гость', color: '#0F8FFF' });
       socket.emit('init', {
         strokes: room.strokes || [],
-        ownerClientId: room.ownerClientId || '',
+        erases:  room.erases  || [],
+        ownerClientId: room.ownerClientId || null,
         moderators: room.moderators || [],
-        members: membersSvc.list(roomId)
+        members: membersSvc.list(roomId) || []
       });
     });
 
-    socket.on('presence', ({ roomId, name, color } = {}) => {
+    socket.on('presence', ({ roomId, name, color }) => {
       if (!roomId) return;
       membersSvc.setPresence(roomId, socket.id, { name, color });
-      membersSvc.broadcast(roomId);
     });
 
-    socket.on('cursor', (payload = {}) => {
-      const { roomId } = payload;
-      if (!roomId) return;
-      const rec = membersSvc.setPresence(roomId, socket.id, {
-        name: payload.name, color: payload.color, clientId: payload.clientId
-      });
-      const out = Object.assign({}, payload, { clientId: rec.clientId });
-      socket.to(roomId).emit('cursor', out);
-    });
-
-    socket.on('stroke-begin', (msg) => {
+    socket.on('cursor', (msg) => {
       if (!msg || !msg.roomId) return;
-      socket.to(msg.roomId).emit('stroke-begin', msg);
-    });
-    socket.on('stroke-progress', (msg) => {
-      if (!msg || !msg.roomId) return;
-      socket.to(msg.roomId).emit('stroke-progress', msg);
+      const clientId = membersSvc.getClientId(msg.roomId, socket.id);
+      io.to(msg.roomId).emit('cursor', { clientId, x: msg.x, y: msg.y, visible: !!msg.visible, color: msg.color, name: msg.name });
     });
 
-    socket.on('stroke', (msg = {}) => {
-      const { roomId, stroke, tempId } = msg;
-      if (!roomId || !stroke || !stroke.id) return;
-      const room = roomsSvc.getRoom(roomId);
-      if (!room) return;
+    socket.on('stroke-begin', (msg) => { if (msg && msg.roomId) socket.to(msg.roomId).emit('stroke-begin', msg); });
+    socket.on('stroke-progress', (msg) => { if (msg && msg.roomId) socket.to(msg.roomId).emit('stroke-progress', msg); });
+    socket.on('stroke-finish', (msg) => { if (msg && msg.roomId) socket.to(msg.roomId).emit('stroke-finish', msg); });
 
-      const added = strokesSvc.addStroke(room, stroke);
-      if (added && stroke.authorId) {
-        const recId = stroke.authorId;
-        membersSvc.resetRedo(roomId, recId);
-      }
-      socket.to(roomId).emit('stroke-finish', { tempId });
-      io.to(roomId).emit('stroke', stroke);
+    socket.on('stroke', ({ roomId, stroke }) => {
+      if (!roomId || !stroke) return;
+      const room = roomsSvc.getRoom(roomId); if (!room) return;
+      if (typeof stroke.t !== 'number') stroke.t = Date.now(); // штамп времени
+      if (strokesSvc.addStroke(room, stroke)) io.to(roomId).emit('stroke', stroke);
     });
 
-    socket.on('delete-stroke', ({ roomId, id } = {}) => {
+    socket.on('delete-stroke', ({ roomId, id }) => {
       if (!roomId || !id) return;
-      const room = roomsSvc.getRoom(roomId);
-      if (!room) return;
-
+      const room = roomsSvc.getRoom(roomId); if (!room) return;
       const clientId = membersSvc.getClientId(roomId, socket.id);
-      const isMod = Array.isArray(room.moderators) && room.moderators.some(x => x.clientId === clientId);
       const s = (room.strokes || []).find(x => x.id === id);
-      if (!s) return;
-      if (s.authorId !== clientId && !isMod) {
-        socket.emit('delete-denied');
-        return;
-      }
+      const modSet = new Set((room.moderators || []).map(m => m.clientId));
+      const allowed = s && (s.authorId === clientId || modSet.has(clientId));
+      if (!allowed) { socket.emit('delete-denied'); return; }
       const removed = strokesSvc.deleteStrokeById(room, id);
       if (removed) io.to(roomId).emit('stroke-deleted', id);
     });
 
+    // === Пиксельный ластик: 'erase-circle'  (+ алиас на старое 'erase-brush')
+    function handleErase({ roomId, x, y, radius }) {
+      if (!roomId) return;
+      const room = roomsSvc.getRoom(roomId); if (!room) return;
+      const circle = strokesSvc.registerEraseCircle(room, x, y, radius);
+      if (!circle) return;
+      io.to(roomId).emit('erase-circle', circle); // транслируем всем
+    }
+    socket.on('erase-circle', handleErase);
+    socket.on('erase-brush', handleErase); // алиас для совместимости
+
     socket.on('undo', (roomId) => {
       if (!roomId) return;
-      const room = roomsSvc.getRoom(roomId);
-      if (!room) return;
+      const room = roomsSvc.getRoom(roomId); if (!room) return;
       const clientId = membersSvc.getClientId(roomId, socket.id);
       const removed = strokesSvc.undo(room, clientId, membersSvc);
       if (removed) io.to(roomId).emit('stroke-deleted', removed.id);
@@ -118,8 +91,7 @@ module.exports = function initSockets({
 
     socket.on('redo', (roomId) => {
       if (!roomId) return;
-      const room = roomsSvc.getRoom(roomId);
-      if (!room) return;
+      const room = roomsSvc.getRoom(roomId); if (!room) return;
       const clientId = membersSvc.getClientId(roomId, socket.id);
       const restored = strokesSvc.redo(room, clientId, membersSvc);
       if (restored) io.to(roomId).emit('stroke-restored', restored);
@@ -127,25 +99,19 @@ module.exports = function initSockets({
 
     socket.on('clear', (roomId) => {
       if (!roomId) return;
-      const room = roomsSvc.getRoom(roomId);
-      if (!room) return;
+      const room = roomsSvc.getRoom(roomId); if (!room) return;
       const clientId = membersSvc.getClientId(roomId, socket.id);
-      const isOwner = !!(clientId && room.ownerClientId === clientId);
-      const isMod = Array.isArray(room.moderators) && room.moderators.some(x => x.clientId === clientId);
-      if (!isOwner && !isMod) {
-        socket.emit('clear-denied');
-        return;
-      }
+      const owner = room.ownerClientId && room.ownerClientId === clientId;
+      const modSet = new Set((room.moderators || []).map(m => m.clientId));
+      if (!owner && !modSet.has(clientId)) { socket.emit('clear-denied'); return; }
       strokesSvc.clear(room);
-      io.to(roomId).emit('cleared');
+      io.to(roomId).emit('cleared'); // клиент сбросит и strokes, и erases
     });
 
-    socket.on('set-moderator', ({ roomId, password, clientId, value } = {}) => {
-      if (!roomId || !clientId) return;
-      if (!MOD_PASSWORD || password !== MOD_PASSWORD) return;
-      const room = roomsSvc.getRoom(roomId);
-      if (!room) return;
-      room.moderators = Array.isArray(room.moderators) ? room.moderators : [];
+    socket.on('set-moderator', ({ roomId, password, clientId, value }) => {
+      if (!roomId || !clientId || password !== (process.env.MOD_PASSWORD || '')) return;
+      const room = roomsSvc.getRoom(roomId); if (!room) return;
+      room.moderators = room.moderators || [];
       const exists = room.moderators.some(x => x.clientId === clientId);
       if (value && !exists) room.moderators.push({ clientId });
       if (!value && exists) room.moderators = room.moderators.filter(x => x.clientId !== clientId);

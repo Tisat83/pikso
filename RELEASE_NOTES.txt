@@ -1,0 +1,16 @@
+Pikso — stable v1.1 (client-only delta)
+
+Included files to overwrite in your project:
+- public/js/canvas/draw.js   — transparent name badge at top-right, aligned connector, refined cursor
+- public/js/net.js           — presence eye + popover, correct self entry, live previews
+
+How to apply:
+1) Unzip and replace the files in your repo keeping the same paths.
+2) Restart your dev server (or refresh the page).
+
+Git (from your repo root):
+git add public/js/canvas/draw.js public/js/net.js
+git commit -m "v1.1: cursor label (transparent + aligned), presence popover + presence fixes"
+git pull --rebase origin main
+git push origin main
+
