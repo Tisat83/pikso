@@ -32,14 +32,55 @@ jobs:
 
       - name: Prepare remote folders (and rooms.json if missing)
         run: |
-          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "mkdir -p $DEPLOY_PATH/current $DEPLOY_PATH/logs $DEPLOY_PATH/current/data &&             if [ ! -f $DEPLOY_PATH/current/data/rooms.json ]; then echo '[]' > $DEPLOY_PATH/current/data/rooms.json; fi"
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "bash -lc '
+            set -e
+            mkdir -p \"$DEPLOY_PATH/current\" \"$DEPLOY_PATH/logs\" \"$DEPLOY_PATH/current/data\"
+            if [ ! -f \"$DEPLOY_PATH/current/data/rooms.json\" ]; then
+              echo \"[]\" > \"$DEPLOY_PATH/current/data/rooms.json\"
+            fi
+          '"
 
       - name: Upload project via rsync (preserve data/rooms.json)
         run: |
-          rsync -az --delete             --exclude ".git"             --exclude "node_modules"             --exclude ".env"             --exclude "logs"             --exclude "data/rooms.json"             -e "ssh -p $SSH_PORT" ./ "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/current/"
+          rsync -az --delete \
+            --exclude ".git" \
+            --exclude "node_modules" \
+            --exclude ".env" \
+            --exclude "logs" \
+            --exclude "data/rooms.json" \
+            -e "ssh -p $SSH_PORT" ./ "$SSH_USER@$SSH_HOST:$DEPLOY_PATH/current/"
 
       - name: Install deps & reload PM2
         run: |
-          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "
-            cd $DEPLOY_PATH/current &&             if ! command -v pm2 >/dev/null 2>&1; then sudo npm i -g pm2; fi &&             NODE_ENV=production npm ci --omit=dev || npm i --omit=dev &&             pm2 startOrReload ecosystem.config.cjs --env production &&             pm2 save
-          "
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "bash -lc '
+            set -e
+            cd \"$DEPLOY_PATH/current\"
+
+            # фикс прав (иногда node_modules/часть файлов могли быть созданы root)
+            if command -v sudo >/dev/null 2>&1; then
+              sudo chown -R \"\$(whoami):\$(whoami)\" .
+            fi
+
+            # node_modules не rsync-ится (exclude), поэтому надо чистить, иначе ловим EACCES
+            rm -rf node_modules
+
+            # deps
+            if [ -f package-lock.json ]; then
+              NODE_ENV=production npm ci --omit=dev
+            else
+              NODE_ENV=production npm i --omit=dev
+            fi
+
+            # pm2 (ставим глобально только если нет)
+            if ! command -v pm2 >/dev/null 2>&1; then
+              if command -v sudo >/dev/null 2>&1; then
+                sudo npm i -g pm2
+              else
+                npm i -g pm2
+              fi
+            fi
+
+            pm2 startOrReload ecosystem.config.cjs --env production
+            pm2 save
+          '"
+
