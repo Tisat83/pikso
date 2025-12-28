@@ -57,9 +57,11 @@ jobs:
             cd \"$DEPLOY_PATH/current\"
 
             # фикс прав (иногда node_modules/часть файлов могли быть созданы root)
-            if command -v sudo >/dev/null 2>&1; then
-              sudo chown -R \"\$(whoami):\$(whoami)\" .
-            fi
+
+            # sudo в GitHub Actions по SSH часто требует пароль -> не используем
+
+            # просто пересобираем node_modules с нуля под текущим пользователем
+
 
             # node_modules не rsync-ится (exclude), поэтому надо чистить, иначе ловим EACCES
             rm -rf node_modules
@@ -73,12 +75,9 @@ jobs:
 
             # pm2 (ставим глобально только если нет)
             if ! command -v pm2 >/dev/null 2>&1; then
-              if command -v sudo >/dev/null 2>&1; then
-                sudo npm i -g pm2
-              else
-                npm i -g pm2
-              fi
+              npm i -g pm2
             fi
+
 
             pm2 startOrReload ecosystem.config.cjs --env production
             pm2 save
