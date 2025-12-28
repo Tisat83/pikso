@@ -31,12 +31,35 @@ initSocket();
 sendPresence(); setTimeout(sendPresence, 80);
 
 state.c.addEventListener('contextmenu', e=>e.preventDefault());
+state._touchPts = state._touchPts || new Map();
+state.touchPanning = false;
 
 state.c.addEventListener('pointerdown', (e)=>{
   if (window.__textInputOpen) return;
+
+  // touch: регистрируем палец; если 2 пальца — включаем pan+pinch
+  if(e.pointerType==='touch' && state._touchPts){
+    state._touchPts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(state._touchPts.size>=2){
+      const pts=[...state._touchPts.values()];
+      const mid={x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2};
+      const dist=Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+
+      state.touchPanning=true;
+      state.panning=true;
+      state.lastPan=mid;
+      state._pinchLastDist=dist;
+
+      e.preventDefault();
+      return;
+    }
+  }
+
+
   const isRight=e.button===2, isPan=isRight || (state.spaceDown && e.button===0);
-  if(isPan){ state.panning=true; state.lastPan={x:e.clientX,y:e.clientY}; return; }
+  if(isPan){ state.panning=true; state.touchPanning=false; state.lastPan={x:e.clientX,y:e.clientY}; return; }
   if(e.button!==0) return;
+  if(state.touchPanning) return;
 
   const w0 = toWorld(e.clientX,e.clientY);
   if(!isInsideBoard(w0)) { updateCursor(); return; }
@@ -61,6 +84,45 @@ state.c.addEventListener('pointerdown', (e)=>{
 });
 
 state.c.addEventListener('pointermove', (e)=>{
+  // --- touch: 2 пальца = pan + pinch zoom ---
+  if(e.pointerType==='touch' && state._touchPts){
+    if(state._touchPts.has(e.pointerId)) state._touchPts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+
+    if(state.touchPanning){
+      const pts=[...state._touchPts.values()];
+      if(pts.length>=2){
+        const mid={x:(pts[0].x+pts[1].x)/2, y:(pts[0].y+pts[1].y)/2};
+        const dist=Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+
+        // pan по смещению середины
+        if(state.lastPan){
+          state.dx += (mid.x - state.lastPan.x);
+          state.dy += (mid.y - state.lastPan.y);
+        }
+        state.lastPan = mid;
+
+        // pinch zoom (инкрементально)
+        if(state._pinchLastDist){
+          const prevScale = state.scale;
+          const wx = (mid.x - state.dx) / prevScale;
+          const wy = (mid.y - state.dy) / prevScale;
+
+          const factor = dist / state._pinchLastDist;
+          state.scale = Math.max(state.MIN_Z, Math.min(state.MAX_Z, prevScale * factor));
+
+          state.dx = mid.x - wx * state.scale;
+          state.dy = mid.y - wy * state.scale;
+        }
+        state._pinchLastDist = dist;
+
+        clampViewToBoard(); drawAll(); scheduleHashUpdate();
+      }
+      e.preventDefault();
+      return;
+    }
+  }
+
+  // --- обычная логика (мышь / 1 палец рисование) ---
   const w=toWorld(e.clientX,e.clientY), now=performance.now();
   state.lastWorld = w; updateCursor();
 
@@ -77,10 +139,12 @@ state.c.addEventListener('pointermove', (e)=>{
     state.dx+=dxs; state.dy+=dys; state.lastPan={x:e.clientX,y:e.clientY};
     clampViewToBoard(); drawAll(); scheduleHashUpdate(); return;
   }
+
   if(state.activeTool==='eraser'){
     if(state.erasingDrag){ eraseAt(e.clientX, e.clientY); }
     return;
   }
+
   if(!state.drawing||!state.current) return;
 
   const a=state.current.__shapeStart||state.current.points[0];
@@ -115,6 +179,7 @@ state.c.addEventListener('pointermove', (e)=>{
     for(let i=0;i<=seg;i++){ const t=(i/seg)*Math.PI*2; pts.push(clampPointToBoard({x:cx+Math.cos(t)*rx, y:cy+Math.sin(t)*ry})); }
     state.current.points=pts;
   }
+
   state.socket.emit('stroke-progress',{roomId:state.roomId,tempId:state.currentTempId,points:state.current.points});
   drawAll();
 });
@@ -132,9 +197,40 @@ function endStroke(){
   }
   state.panning=false;
 }
-state.c.addEventListener('pointerup', e=>{ state.panning = false; if(state.activeTool==='eraser'){ state.erasingDrag=false; hideBrush(); return; } endStroke(e); });
-state.c.addEventListener('pointercancel', e=>{ state.panning = false; if(state.activeTool==='eraser'){ state.erasingDrag=false; hideBrush(); return; } endStroke(e); });
-state.c.addEventListener('pointerleave', ()=>{ state.panning = false; state.erasingDrag=false; state.lastWorld=null; updateCursor(); hideBrush(); state.socket.emit('cursor',{roomId:state.roomId,x:0,y:0,visible:false,name:(state.nameEl.value||'').trim()||'Гость',color:state.colorEl.value}); });
+state.c.addEventListener('pointerup', (e)=>{
+  if (e.pointerType === 'touch' && state._touchPts) {
+    state._touchPts.delete(e.pointerId);
+    if (state._touchPts.size < 2) state.touchPanning = false;
+  }
+
+  state.panning = false;
+  if (state.activeTool === 'eraser') { state.erasingDrag = false; hideBrush(); return; }
+  endStroke();
+});
+
+state.c.addEventListener('pointercancel', (e)=>{
+  if (e.pointerType === 'touch' && state._touchPts) {
+    state._touchPts.delete(e.pointerId);
+    if (state._touchPts.size < 2) state.touchPanning = false;
+  }
+
+  state.panning = false;
+  if (state.activeTool === 'eraser') { state.erasingDrag = false; hideBrush(); return; }
+  endStroke();
+});
+
+state.c.addEventListener('pointerleave', ()=>{
+  if(state._touchPts) state._touchPts.clear();
+  state.touchPanning=false;
+  state._pinchLastDist=null;
+
+  state.panning = false;
+  state.erasingDrag=false;
+  state.lastWorld=null;
+  updateCursor();
+  hideBrush();
+  state.socket.emit('cursor',{roomId:state.roomId,x:0,y:0,visible:false,name:(state.nameEl.value||'').trim()||'Гость',color:state.colorEl.value});
+});
 
 addEventListener('wheel', function(e){
   if (window.__textInputOpen) return;

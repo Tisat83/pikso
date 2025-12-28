@@ -22,11 +22,81 @@ export function initDOMRefs(){
   state.colorEl=document.getElementById('color'); state.sizeEl=document.getElementById('size'); state.nameEl=document.getElementById('name');
   state.undoBtn=document.getElementById('undo'); state.redoBtn=document.getElementById('redo'); state.clearBtn=document.getElementById('clear');
   state.fitBtn=document.getElementById('fit');
-  state.downloadBtn=document.getElementById('downloadBtn'); state.downloadModal=document.getElementById('downloadModal'); state.dlOk=document.getElementById('dlOk'); state.dlCancel=document.getElementById('dlCancel');
+  state.downloadBtn=document.getElementById('downloadBtn'); state.downloadModal=document.getElementById('downloadModal');
+  state.dlOk=document.getElementById('dlOk'); state.dlCancel=document.getElementById('dlCancel');
   state.onlineChip=document.getElementById('onlineChip');
-  state.loginBtn=document.getElementById('loginBtn'); state.authModal=document.getElementById('authModal'); state.authCancel=document.getElementById('authCancel'); state.authSubmit=document.getElementById('authSubmit');
-  state.roomsBtn=document.getElementById('roomsBtn'); state.roomsWrap=document.getElementById('roomsWrap'); state.roomsList=document.getElementById('roomsList'); state.newBtn=document.getElementById('newPrivate');
+  state.loginBtn=document.getElementById('loginBtn'); state.authModal=document.getElementById('authModal');
+  state.authCancel=document.getElementById('authCancel'); state.authSubmit=document.getElementById('authSubmit');
+  state.roomsWrap=document.getElementById('roomsWrap');
+  state.roomsBtn=document.getElementById('roomsBtn');
+  state.roomsList=document.getElementById('roomsList');
+  state.newBtn=document.getElementById('newPrivate');
+
+
+  // mobile toolbar toggle + swipe
+  state.toolbarEl = document.getElementById('toolbar');
+  state.tbHandle = document.getElementById('tbHandle');
+
+  const setCollapsed = (collapsed)=>{
+    document.body.classList.toggle('tb-collapsed', !!collapsed);
+    localStorage.setItem('pikso:tbCollapsed', collapsed ? '1' : '0');
+    if(state.tbHandle) state.tbHandle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  };
+
+  // initial
+  setCollapsed(localStorage.getItem('pikso:tbCollapsed') === '1');
+
+  // tap on handle
+  if(state.tbHandle){
+    state.tbHandle.addEventListener('click', ()=>{
+      setCollapsed(!document.body.classList.contains('tb-collapsed'));
+    });
+  }
+
+  // swipe LEFT on toolbar to hide
+  if(state.toolbarEl){
+    let sx=0, sy=0, tracking=false;
+
+    state.toolbarEl.addEventListener('pointerdown', (e)=>{
+      if(e.pointerType!=='touch') return;
+      tracking=true; sx=e.clientX; sy=e.clientY;
+    }, {passive:true});
+
+    state.toolbarEl.addEventListener('pointermove', (e)=>{
+      if(!tracking || e.pointerType!=='touch') return;
+      const dx=e.clientX - sx, dy=e.clientY - sy;
+      if(dx < -40 && Math.abs(dx) > Math.abs(dy) + 10){
+        tracking=false;
+        setCollapsed(true);
+      }
+    }, {passive:true});
+
+    state.toolbarEl.addEventListener('pointerup', ()=>{ tracking=false; }, {passive:true});
+    state.toolbarEl.addEventListener('pointercancel', ()=>{ tracking=false; }, {passive:true});
+  }
+
+  // swipe RIGHT from left edge to show
+  let edgeTrack=false, esx=0, esy=0;
+  document.addEventListener('pointerdown', (e)=>{
+    if(e.pointerType!=='touch') return;
+    if(!document.body.classList.contains('tb-collapsed')) return;
+    if(e.clientX > 24) return; // только от левого края
+    edgeTrack=true; esx=e.clientX; esy=e.clientY;
+  }, {passive:true});
+
+  document.addEventListener('pointermove', (e)=>{
+    if(!edgeTrack || e.pointerType!=='touch') return;
+    const dx=e.clientX - esx, dy=e.clientY - esy;
+    if(dx > 45 && Math.abs(dx) > Math.abs(dy) + 10){
+      edgeTrack=false;
+      setCollapsed(false);
+    }
+  }, {passive:true});
+
+  document.addEventListener('pointerup', ()=>{ edgeTrack=false; }, {passive:true});
+  document.addEventListener('pointercancel', ()=>{ edgeTrack=false; }, {passive:true});
 }
+
 
 export function initIdentity(){
   state.nameEl.value=localStorage.getItem('pikso:name')||'';
@@ -50,12 +120,53 @@ export function wireToolbar(){
   // size popover
   const sizeBtn=document.getElementById('sizeBtn');
   const sizePopover=document.getElementById('sizePopover');
+  if(sizePopover && sizePopover.parentElement !== document.body) document.body.appendChild(sizePopover);
   const sizeRange=state.sizeEl;
   const sizeVal=document.getElementById('sizeVal');
   const sizePreview=document.getElementById('sizePreview');
   sizeVal.textContent=(+sizeRange.value||1);
-  sizeBtn.addEventListener('click', e=>{ sizePopover.style.display=sizePopover.style.display==='none'?'block':'none'; refreshSizePreview(); e.stopPropagation(); });
-  document.addEventListener('click', e=>{ if(sizePopover.style.display==='block' && !sizePopover.contains(e.target) && e.target!==sizeBtn){ sizePopover.style.display='none'; }});
+  function positionSizePopover(){
+    const r = sizeBtn.getBoundingClientRect();
+    const pad = 10;
+    const w = sizePopover.offsetWidth || 220;
+    const h = sizePopover.offsetHeight || 160;
+
+    let left = r.right + 10;
+    let top  = Math.round(r.top);
+
+    // если справа не влазит — показываем слева
+    if(left + w > window.innerWidth - pad){
+      left = Math.max(pad, r.left - 10 - w);
+    }
+    // не вылезаем за низ/верх
+    top = Math.min(window.innerHeight - pad - h, Math.max(pad, top));
+
+    sizePopover.style.left = left + 'px';
+    sizePopover.style.top  = top + 'px';
+  }
+
+  sizeBtn.addEventListener('click', (e)=>{
+    const willOpen = (sizePopover.style.display !== 'block');
+    sizePopover.style.display = willOpen ? 'block' : 'none';
+    if(willOpen){
+      refreshSizePreview();
+      // дать браузеру посчитать размеры popover
+      requestAnimationFrame(()=>{ positionSizePopover(); });
+    }
+    e.stopPropagation();
+  });
+
+  document.addEventListener('click', (e)=>{
+    if(sizePopover.style.display==='block' && !sizePopover.contains(e.target) && e.target!==sizeBtn){
+      sizePopover.style.display='none';
+    }
+  });
+
+  // если открыто — при скролле/ресайзе перепозиционируем
+  const tbEl = document.getElementById('toolbar');
+  window.addEventListener('resize', ()=>{ if(sizePopover.style.display==='block') positionSizePopover(); }, {passive:true});
+  if(tbEl) tbEl.addEventListener('scroll', ()=>{ if(sizePopover.style.display==='block') positionSizePopover(); }, {passive:true});
+
   sizeRange.addEventListener('input', function(){ sizeVal.textContent=(+this.value||1); refreshSizePreview(); });
 
   // actions & shortcuts
@@ -135,8 +246,40 @@ export function wireRoomsList(){
   });
 
   state.newBtn.addEventListener('click', async function(){ try{ const r=await fetch('/api/rooms',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clientId: state.clientId})}); if(!r.ok) throw 0; const data=await r.json(); addMyRoomLocal(data.roomId); location.href='/canvas/'+data.roomId+'#0,0,1.00'; }catch(e){ alert('Не удалось создать страницу'); } });
-  state.roomsBtn.addEventListener('click', function(e){ state.roomsWrap.classList.toggle('open'); if(state.roomsWrap.classList.contains('open')) refreshRoomsList(); e.stopPropagation(); });
-  document.addEventListener('click', function(){ state.roomsWrap.classList.remove('open'); });
+  // ВЫНОСИМ список страниц в body, чтобы он не резался панелью и не прятался за холстом (особенно на мобиле)
+  if(state.roomsList && state.roomsList.parentElement !== document.body) document.body.appendChild(state.roomsList);
+
+  state.roomsBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+
+    const isOpen = (state.roomsList.style.display === 'block');
+    state.roomsList.style.display = isOpen ? 'none' : 'block';
+
+    if(!isOpen){
+      // позиционируем рядом с кнопкой
+      const r = state.roomsBtn.getBoundingClientRect();
+      const pad = 10;
+      const w = 280;
+      const h = Math.min(window.innerHeight * 0.5, 360);
+
+      let left = r.right + 10;
+      let top  = r.top;
+
+      if(left + w > window.innerWidth - pad) left = Math.max(pad, r.left - 10 - w);
+      top = Math.min(window.innerHeight - pad - h, Math.max(pad, top));
+
+      state.roomsList.style.left = left + 'px';
+      state.roomsList.style.top  = top + 'px';
+      state.roomsList.style.maxHeight = h + 'px';
+
+      refreshRoomsList();
+    }
+  });
+
+  document.addEventListener('click', function(){
+    state.roomsList.style.display = 'none';
+  });
+
 }
 
 // Export functions kept identical
