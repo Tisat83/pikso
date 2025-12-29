@@ -234,6 +234,11 @@ state.c.addEventListener('pointerleave', ()=>{
 
 addEventListener('wheel', function(e){
   if (window.__textInputOpen) return;
+
+  // Если колесо крутят над тулбаром — даём скроллиться панели, холст не зумим
+  const tb = document.getElementById('toolbar');
+  if (tb && (e.target === tb || tb.contains(e.target))) return;
+
   e.preventDefault();
   const prev=state.scale;
   const f = Math.pow(1.001, -e.deltaY);

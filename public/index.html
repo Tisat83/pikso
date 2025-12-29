@@ -18,9 +18,32 @@
     html,body { height:100%; margin:0; background:var(--bg); color:var(--fg); font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif; overflow:hidden; overscroll-behavior:none; }
     #c { height:100%; width:100%; display:block; touch-action:none; background:var(--bg); cursor: crosshair; }
 
-    #toolbar { position:fixed; top:12px; left:12px; background:var(--panel); padding:10px 8px; border-radius:12px;
-               box-shadow:var(--panel-shadow); display:flex; flex-direction:column; gap:8px; align-items:center;
-               border:1px solid var(--panel-border); z-index:1500; }
+    #toolbar {
+      position:fixed;
+      top:12px;
+      bottom:12px;
+      left:12px;
+
+      background:var(--panel);
+      padding:10px 8px 16px;
+      border-radius:12px;
+      box-shadow:var(--panel-shadow);
+      border:1px solid var(--panel-border);
+      z-index:1500;
+
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      align-items:center;
+
+      overflow-y:auto;
+      overscroll-behavior: contain;
+    }
+
+    /* скрываем скроллбар, но оставляем прокрутку */
+    #toolbar { scrollbar-width: none; }
+    #toolbar::-webkit-scrollbar { width:0; height:0; }
+
     .iconbtn{
       --btn-size:48px;
       width:var(--btn-size);
@@ -149,6 +172,14 @@
       /* текстовый инструмент (input поверх холста) — иначе iOS зумит и "застревает" */
       #pikso-text-input { font-size:16px !important; }
     }
+    /* Help modal: показываем подсказки по устройству */
+    .help-desktop{ display:block; }
+    .help-mobile{ display:none; }
+
+    @media (max-width: 720px){
+      .help-desktop{ display:none; }
+      .help-mobile{ display:block; }
+    }
 
   </style>
 </head>
@@ -276,12 +307,28 @@
 
   <div id="helpModal" class="modal-backdrop" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true" aria-label="Подсказки" style="width:360px">
-      <h3>Подсказки</h3>
-      <ul style="font:13px/1.5 system-ui,Segoe UI,Roboto,Arial,sans-serif; padding-left:18px;">
-        <li>ЛКМ — рисовать • ПКМ или Пробел+ЛКМ — панорама</li>
+	<div class="help-desktop">
+      <div style="font-size:12px; color:var(--muted); margin:8px 0 4px;">ПК</div>
+      <ul style="font:13px/1.5 system-ui,Segoe UI,Roboto,Arial,sans-serif; padding-left:18px; margin:0 0 10px;">
+        <li>ЛКМ — рисовать</li>
+        <li>ПКМ или Пробел+ЛКМ — панорама</li>
         <li>Колесо — зум • F — показать весь рисунок • 0 — сброс вида</li>
-        <li>E — ластик • Delete — очистить • Ctrl+Z / Ctrl+Shift+Z — отмена/повтор</li>
+        <li>P/L/R/O/T/E/G — инструменты • Ctrl+Z / Ctrl+Shift+Z — отмена/повтор</li>
       </ul>
+    </div>
+
+    <div class="help-mobile">
+      <div style="font-size:12px; color:var(--muted); margin:8px 0 4px;">Телефон</div>
+      <ul style="font:13px/1.5 system-ui,Segoe UI,Roboto,Arial,sans-serif; padding-left:18px; margin:0;">
+        <li>1 палец — рисовать (на выбранном инструменте)</li>
+        <li>2 пальца — перемещение холста (панорама)</li>
+        <li>Щипок 2 пальцами — масштаб (zoom)</li>
+        <li>Свайп влево по панели — скрыть панель</li>
+        <li>Свайп вправо от левого края или стрелка слева — показать панель</li>
+      </ul>
+    </div>
+
+
       <div class="actions"><button id="helpOk" class="btn primary">Понятно</button></div>
     </div>
   </div>
